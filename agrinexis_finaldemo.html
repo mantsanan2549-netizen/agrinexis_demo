@@ -1,0 +1,1583 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriNexis — Digital Product Passport</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script>
+window.elementSdk={init:function(o){if(o?.onConfigChange)o.onConfigChange(o.defaultConfig||{});},setConfig:function(){}};
+window.dataSdk={get:function(){return null;},set:function(){}};
+</script>
+<script>
+tailwind.config={theme:{extend:{colors:{mango:'#F4B400',mangoLight:'#FFD54F',forest:'#4CAF50',forestDark:'#388E3C',cream:'#FFF4D6',creamDark:'#F5E6B8',dark:'#1A1A2E',darkLight:'#16213E',surface:'#F8F9FA',surfaceCard:'#FFFFFF'}}}}
+</script>
+<style>
+*{font-family:'DM Sans',sans-serif;}
+.mono{font-family:'Space Mono',monospace;}
+html,body{height:100%;margin:0;}
+.app-root{height:100%;overflow:auto;}
+
+/* Dark mode */
+.dark-mode{background:#0f0f1a!important;color:#e2e8f0!important;}
+.dark-mode .bg-white{background:#1e1e2e!important;}
+.dark-mode .bg-surface,.dark-mode body{background:#0f0f1a!important;}
+.dark-mode .border{border-color:#2d2d44!important;}
+.dark-mode .text-gray-500{color:#94a3b8!important;}
+.dark-mode .text-gray-400{color:#64748b!important;}
+.dark-mode .text-dark{color:#e2e8f0!important;}
+.dark-mode .bg-gray-50,.dark-mode .bg-gray-100{background:#1a1a2e!important;}
+.dark-mode .bg-cream{background:#2d2510!important;}
+.dark-mode input,.dark-mode select{background:#1e1e2e!important;color:#e2e8f0!important;border-color:#2d2d44!important;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounceIn{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+
+.anim-fade{animation:fadeUp .4s ease both}
+.anim-fade-d1{animation:fadeUp .4s ease .06s both}
+.anim-fade-d2{animation:fadeUp .4s ease .12s both}
+.anim-fade-d3{animation:fadeUp .4s ease .18s both}
+.anim-fade-d4{animation:fadeUp .4s ease .24s both}
+.anim-slide{animation:slideIn .35s ease both}
+.anim-bounce{animation:bounceIn .4s ease both}
+
+.tab-active{border-bottom:2px solid #F4B400;color:#1A1A2E;font-weight:600}
+.tab-inactive{border-bottom:2px solid transparent;color:#888}
+.tab-inactive:hover{color:#555}
+
+.stage-dot{width:10px;height:10px;border-radius:50%}
+.stage-active{background:#4CAF50;animation:pulse-dot 2s infinite}
+.stage-done{background:#F4B400}
+.stage-pending{background:#ddd}
+
+.freshness-bar{height:8px;border-radius:4px;background:#e5e5e5;overflow:hidden}
+.freshness-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+.chart-bar{transition:height .5s ease,background .3s;border-radius:4px 4px 0 0}
+.chart-bar:hover{filter:brightness(1.1)}
+
+.insight-card{border-left:3px solid #F4B400}
+.mobile-card{border-radius:16px;overflow:hidden}
+
+.skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
+
+.leaflet-container{border-radius:12px;}
+.notification-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid white}
+
+/* Bottom nav mobile */
+.bottom-nav{display:none}
+@media(max-width:640px){
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid #e5e7eb;z-index:100;padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+  .top-nav-hide{display:none}
+  .main-pad{padding-bottom:80px!important}
+}
+
+/* Lang selector */
+.lang-btn.active{background:#F4B400;color:#1A1A2E;font-weight:600}
+
+/* QR modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal-box{background:white;border-radius:20px;padding:24px;max-width:340px;width:90%;animation:bounceIn .3s ease}
+
+/* Toast */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1A1A2E;color:white;padding:10px 20px;border-radius:100px;font-size:13px;z-index:300;animation:fadeUp .3s ease both;white-space:nowrap}
+
+/* Search highlight */
+.highlight{background:#FFF4D6;border-radius:3px;padding:0 2px}
+
+/* Stage btn active */
+.stage-btn-active{ring:2px;ring-offset:1px}
+
+body{box-sizing:border-box}
+</style>
+</head>
+<body class="h-full bg-surface text-dark" id="bodyEl">
+<div class="app-root w-full flex flex-col" id="appRoot">
+
+<!-- ====== LOGIN SCREEN ====== -->
+<div id="loginScreen" class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-dark to-darkLight" style="z-index:9999;">
+  <div class="w-full max-w-sm mx-auto p-6 anim-bounce">
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 rounded-2xl bg-mango flex items-center justify-center mx-auto mb-4 shadow-lg">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" stroke-width="2.5">
+          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
+          <path d="M8 12l3 3 5-5"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white">AgriNexis</h1>
+      <p class="text-gray-400 text-sm mt-1">Powering Global Flows from Farms</p>
+    </div>
+    <div class="bg-white/10 rounded-2xl p-5 backdrop-blur">
+      <div class="mb-4">
+        <label class="text-xs text-gray-300 mb-1 block">Email</label>
+        <input id="loginEmail" type="email" value="admin@thaiexport.co" class="w-full px-4 py-2.5 rounded-xl bg-white/20 text-white placeholder-gray-400 border border-white/20 focus:outline-none focus:border-mango text-sm" placeholder="your@email.com">
+      </div>
+      <div class="mb-5">
+        <label class="text-xs text-gray-300 mb-1 block">Password</label>
+        <input id="loginPass" type="password" value="••••••••" class="w-full px-4 py-2.5 rounded-xl bg-white/20 text-white placeholder-gray-400 border border-white/20 focus:outline-none focus:border-mango text-sm" placeholder="••••••••">
+      </div>
+      <div class="flex gap-2 mb-4">
+        <button onclick="doLogin('business')" class="flex-1 py-2.5 bg-mango text-dark font-bold rounded-xl hover:bg-mangoLight transition text-sm">Login as Business</button>
+        <button onclick="doLogin('consumer')" class="flex-1 py-2.5 bg-white/20 text-white font-semibold rounded-xl hover:bg-white/30 transition text-sm">Consumer</button>
+      </div>
+      <p class="text-center text-xs text-gray-400">Demo: any credentials work · v3.0 Startup</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== ONBOARDING OVERLAY ====== -->
+<div id="onboardingOverlay" class="fixed inset-0 hidden" style="z-index:8888;">
+  <div class="fixed inset-0 bg-black/60"></div>
+  <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto anim-fade" style="max-height:80vh;overflow-y:auto">
+    <div id="onboardStep0" class="onboard-step text-center">
+      <div class="text-5xl mb-4">👋</div>
+      <h2 class="text-xl font-bold mb-2">Welcome to AgriNexis</h2>
+      <p class="text-sm text-gray-500 mb-6">Track every product from farm to shelf. Let's take a quick tour.</p>
+      <button onclick="nextOnboard(1)" class="w-full py-3 bg-dark text-white rounded-xl font-semibold">Start Tour →</button>
+      <button onclick="skipOnboard()" class="w-full py-2 text-sm text-gray-400 mt-2">Skip for now</button>
+    </div>
+    <div id="onboardStep1" class="onboard-step hidden text-center">
+      <div class="text-5xl mb-4">📦</div>
+      <h2 class="text-xl font-bold mb-2">Product Registry</h2>
+      <p class="text-sm text-gray-500 mb-6">Browse all 13 products. Filter by Fresh or Processed. Click any product to see full details including GPS tracking, cold chain data, and blockchain verification.</p>
+      <button onclick="nextOnboard(2)" class="w-full py-3 bg-dark text-white rounded-xl font-semibold">Next →</button>
+    </div>
+    <div id="onboardStep2" class="onboard-step hidden text-center">
+      <div class="text-5xl mb-4">📊</div>
+      <h2 class="text-xl font-bold mb-2">Customer Intelligence</h2>
+      <p class="text-sm text-gray-500 mb-6">See real-time scan data, consumer behavior, top markets, and AI-powered insights to help you make smarter export decisions.</p>
+      <button onclick="nextOnboard(3)" class="w-full py-3 bg-dark text-white rounded-xl font-semibold">Next →</button>
+    </div>
+    <div id="onboardStep3" class="onboard-step hidden text-center">
+      <div class="text-5xl mb-4">📱</div>
+      <h2 class="text-xl font-bold mb-2">QR Code for Consumers</h2>
+      <p class="text-sm text-gray-500 mb-6">Each product has a unique QR code. Scan it to see the Consumer View — origin story, nutrition, sustainability, and real-time journey tracking.</p>
+      <button onclick="skipOnboard()" class="w-full py-3 bg-mango text-dark rounded-xl font-bold">Get Started 🚀</button>
+    </div>
+    <div class="flex justify-center gap-2 mt-5" id="onboardDots">
+      <div class="w-2 h-2 rounded-full bg-dark" id="dot0"></div>
+      <div class="w-2 h-2 rounded-full bg-gray-200" id="dot1"></div>
+      <div class="w-2 h-2 rounded-full bg-gray-200" id="dot2"></div>
+      <div class="w-2 h-2 rounded-full bg-gray-200" id="dot3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== NOTIFICATION PANEL ====== -->
+<div id="notifBackdrop" class="hidden fixed inset-0" style="z-index:6999;" onclick="toggleNotif()"></div>
+<div id="notifPanel" class="hidden fixed right-3 w-80 bg-white rounded-2xl shadow-2xl border anim-fade overflow-hidden" style="z-index:7000; top:100px; max-height:calc(100vh - 160px); overflow-y:auto;">
+  <div class="px-4 py-3 border-b flex items-center justify-between">
+    <span class="font-semibold text-sm">Notifications</span>
+    <button onclick="toggleNotif()" class="text-gray-400 hover:text-dark"><i data-lucide="x" class="w-4 h-4"></i></button>
+  </div>
+  <div id="notifList" class="max-h-80 overflow-y-auto"></div>
+</div>
+
+<!-- ====== ADD PRODUCT MODAL ====== -->
+<div id="addProductModal" class="modal-overlay hidden">
+  <div class="modal-box w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-lg">Add New Product</h2>
+      <button onclick="closeAddModal()" class="text-gray-400 hover:text-dark"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+
+    <!-- Barcode scan section -->
+    <div class="mb-4 p-3 bg-cream rounded-xl border border-mango/30">
+      <p class="text-xs font-semibold text-dark mb-2 flex items-center gap-1"><i data-lucide="scan-line" class="w-3.5 h-3.5 text-mango"></i> Scan Barcode to Auto-fill</p>
+      <div id="scannerBox" class="hidden mb-3">
+        <video id="scannerVideo" class="w-full rounded-lg" style="height:180px;object-fit:cover;background:#000;" autoplay playsinline></video>
+        <p class="text-xs text-center text-gray-400 mt-1">Point camera at barcode or QR code</p>
+        <button onclick="stopScanner()" class="mt-2 w-full py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-medium hover:bg-red-50 transition">Stop Scanner</button>
+      </div>
+      <div id="scanResult" class="hidden mb-2 p-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700"></div>
+      <button onclick="startScanner()" id="scanBtn" class="w-full py-2 bg-mango text-dark font-semibold rounded-lg text-sm hover:bg-mangoLight transition flex items-center justify-center gap-2">
+        <i data-lucide="scan-line" class="w-4 h-4"></i> Scan Barcode / QR Code
+      </button>
+      <p class="text-xs text-gray-400 text-center mt-1.5">หรือกรอกข้อมูลด้านล่างด้วยตัวเองได้เลย</p>
+    </div>
+
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Product Name *</label>
+          <input id="addName" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="e.g. Dragon Fruit">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Emoji</label>
+          <input id="addEmoji" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="🍎" value="🌿">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Category *</label>
+          <select id="addCat" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango bg-white">
+            <option value="fresh">Fresh</option>
+            <option value="processed">Processed</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Status</label>
+          <select id="addStatus" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango bg-white">
+            <option>Farm</option><option>Processing</option><option>In Transit</option><option>Retail</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 mb-1 block">Origin *</label>
+        <input id="addOrigin" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="e.g. Chiang Rai, Thailand">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 mb-1 block">Certifications (comma-separated)</label>
+        <input id="addCerts" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="GlobalGAP, Organic, HACCP">
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Calories</label>
+          <input id="addCal" type="number" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="60">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Sugar</label>
+          <input id="addSugar" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="13g">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Fresh Days</label>
+          <input id="addFreshDays" type="number" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="14">
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 mb-1 block">Carbon Footprint</label>
+        <input id="addCarbon" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-mango" placeholder="0.8 kg CO₂">
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closeAddModal()" class="flex-1 py-2.5 border rounded-xl text-sm font-semibold hover:bg-gray-50 transition">Cancel</button>
+      <button onclick="submitAddProduct()" class="flex-1 py-2.5 bg-mango text-dark font-bold rounded-xl hover:bg-mangoLight transition text-sm">Add Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== QR MODAL ====== -->
+<div id="qrModal" class="modal-overlay hidden">
+  <div class="modal-box text-center">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold">QR Code</h2>
+      <button onclick="closeQrModal()" class="text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div id="qrDisplay" class="mb-4 flex justify-center"></div>
+    <p id="qrProductName" class="font-semibold mb-1 text-sm"></p>
+    <p class="text-xs text-gray-400 mb-4">Scan to view consumer passport</p>
+    <button onclick="downloadQR()" class="w-full py-2.5 bg-dark text-white rounded-xl text-sm font-semibold hover:bg-darkLight transition flex items-center justify-center gap-2">
+      <i data-lucide="download" class="w-4 h-4"></i> Download QR
+    </button>
+  </div>
+</div>
+
+<!-- ====== TOP NAV ====== -->
+<header class="bg-dark text-white px-4 py-2 flex-shrink-0 z-50 top-nav-hide" id="topNav">
+  <!-- Row 1: Logo + Role + Dark + Notif + Logout -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-mango flex items-center justify-center flex-shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" stroke-width="2.5">
+          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
+          <path d="M8 12l3 3 5-5"/>
+        </svg>
+      </div>
+      <span class="font-bold text-sm" id="navTitle">AgriNexis</span>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <button onclick="toggleDark()" class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition" id="darkBtn">
+        <i data-lucide="moon" class="w-4 h-4"></i>
+      </button>
+      <button onclick="toggleNotif()" class="relative w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
+        <i data-lucide="bell" class="w-4 h-4"></i>
+        <span class="notification-dot" id="notifDot"></span>
+      </button>
+      <span class="text-xs px-2 py-1 bg-forest rounded-full text-white font-medium" id="roleLabel">Business</span>
+      <button onclick="toggleCustomerPreview()" id="customerViewBtn" class="text-xs px-2 py-1 bg-white/10 border border-white/30 rounded-full hover:bg-white/20 transition flex items-center gap-1">
+        <i data-lucide="smartphone" class="w-3 h-3"></i>
+        <span>Consumer</span>
+      </button>
+      <button onclick="doLogout()" class="text-xs px-2 py-1 border border-gray-600 rounded-full hover:bg-white/10 transition">Logout</button>
+    </div>
+  </div>
+  <!-- Row 2: Search + Lang -->
+  <div class="flex items-center gap-2 mt-2 pb-1">
+    <div class="relative flex-1">
+      <input id="globalSearch" type="text" placeholder="Search products..." oninput="onSearch(this.value)" class="text-xs px-3 py-1.5 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-mango w-full">
+      <i data-lucide="search" class="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+    </div>
+    <div class="flex gap-1 bg-white/10 rounded-lg p-0.5 flex-shrink-0">
+      <button onclick="setLang('en')" id="langEN" class="lang-btn text-xs px-2 py-1 rounded-md transition active">EN</button>
+      <button onclick="setLang('th')" id="langTH" class="lang-btn text-xs px-2 py-1 rounded-md transition text-gray-400 hover:text-white">TH</button>
+      <button onclick="setLang('zh')" id="langZH" class="lang-btn text-xs px-2 py-1 rounded-md transition text-gray-400 hover:text-white">ZH</button>
+      <button onclick="setLang('fr')" id="langFR" class="lang-btn text-xs px-2 py-1 rounded-md transition text-gray-400 hover:text-white">FR</button>
+    </div>
+  </div>
+</header>
+
+<!-- ====== BIZ NAV TABS ====== -->
+<nav class="bg-white border-b px-4 flex gap-1 flex-shrink-0 top-nav-hide" id="bizNav">
+  <button onclick="showView('dashboard')" class="px-3 py-2.5 text-sm transition" id="navDashboard" data-i18n="nav_dashboard">Dashboard</button>
+  <button onclick="showView('intelligence')" class="px-3 py-2.5 text-sm transition" id="navIntelligence" data-i18n="nav_intelligence">Intelligence</button>
+</nav>
+
+<!-- ====== MAIN ====== -->
+<main class="flex-1 overflow-auto main-pad" id="mainContent">
+
+  <!-- DASHBOARD -->
+  <div id="viewDashboard" class="p-4 md:p-6 max-w-7xl mx-auto w-full">
+    <div class="flex items-center justify-between mb-4 anim-fade">
+      <div>
+        <h1 class="text-xl font-bold" id="dashTitle" data-i18n="dashboard_title">Business Overview</h1>
+        <p class="text-sm text-gray-500" data-i18n="dashboard_sub">Track products, compliance, and engagement.</p>
+      </div>
+      <button onclick="openAddModal()" class="flex items-center gap-2 px-4 py-2 bg-mango text-dark font-semibold rounded-xl hover:bg-mangoLight transition text-sm">
+        <i data-lucide="plus" class="w-4 h-4"></i> <span class="hidden sm:inline" data-i18n="add_product">Add Product</span>
+      </button>
+    </div>
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div class="bg-white rounded-xl p-4 border anim-fade-d1">
+        <div class="flex items-center gap-2 mb-2"><i data-lucide="package" class="w-4 h-4 text-mango"></i><span class="text-xs text-gray-500" data-i18n="kpi_products">Total Products</span></div>
+        <p class="text-2xl font-bold mono" id="kpiProductCount">13</p>
+        <p class="text-xs text-forest mt-1">+3 this month</p>
+      </div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d2">
+        <div class="flex items-center gap-2 mb-2"><i data-lucide="truck" class="w-4 h-4 text-forest"></i><span class="text-xs text-gray-500" data-i18n="kpi_shipments">Active Shipments</span></div>
+        <p class="text-2xl font-bold mono">7</p>
+        <p class="text-xs text-forest mt-1" data-i18n="on_schedule">On schedule</p>
+      </div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d3">
+        <div class="flex items-center gap-2 mb-2"><i data-lucide="shield-check" class="w-4 h-4 text-forest"></i><span class="text-xs text-gray-500" data-i18n="kpi_compliance">Compliance Rate</span></div>
+        <p class="text-2xl font-bold mono">98.2%</p>
+        <p class="text-xs text-mango mt-1">2 pending audits</p>
+      </div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d4">
+        <div class="flex items-center gap-2 mb-2"><i data-lucide="scan-line" class="w-4 h-4 text-mango"></i><span class="text-xs text-gray-500">QR Scans</span></div>
+        <p class="text-2xl font-bold mono">24.8K</p>
+        <p class="text-xs text-forest mt-1">↑ 18% vs last month</p>
+      </div>
+    </div>
+    <!-- Search + Filter -->
+    <div class="mb-4 flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
+      <h2 class="font-semibold text-base" data-i18n="product_registry">Product Registry</h2>
+      <div class="flex flex-wrap gap-2 items-center">
+        <!-- Mobile search -->
+        <div class="relative sm:hidden">
+          <input id="mobileSearch" type="text" placeholder="Search..." oninput="onSearch(this.value)" class="text-xs px-3 py-1.5 border rounded-lg focus:outline-none focus:border-mango w-36">
+          <i data-lucide="search" class="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        </div>
+        <select id="statusFilter" onchange="renderProducts()" class="text-xs px-3 py-1.5 border rounded-lg bg-white focus:outline-none cursor-pointer">
+          <option value="all">All Status</option>
+          <option value="Farm">Farm</option>
+          <option value="Processing">Processing</option>
+          <option value="In Transit">In Transit</option>
+          <option value="Retail">Retail</option>
+        </select>
+        <button onclick="filterCategory('all')" class="text-xs px-3 py-1 rounded-full border transition" id="filterAll">All</button>
+        <button onclick="filterCategory('fresh')" class="text-xs px-3 py-1 rounded-full border transition" id="filterFresh">Fresh</button>
+        <button onclick="filterCategory('processed')" class="text-xs px-3 py-1 rounded-full border transition" id="filterProcessed">Processed</button>
+      </div>
+    </div>
+    <div id="productList" class="space-y-2"></div>
+    <p id="noResults" class="hidden text-center text-gray-400 py-8 text-sm">No products found</p>
+  </div>
+
+  <!-- PRODUCT DETAIL -->
+  <div id="viewDetail" class="hidden">
+    <div class="p-4 md:p-6 max-w-5xl mx-auto w-full">
+      <button onclick="showView('dashboard')" class="flex items-center gap-1 text-sm text-gray-500 hover:text-dark mb-4 transition">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> <span data-i18n="back_dashboard">Back to Dashboard</span>
+      </button>
+      <div class="flex items-start gap-4 mb-5 anim-fade">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" id="detailIcon"></div>
+        <div class="flex-1 min-w-0">
+          <h1 class="text-xl font-bold" id="detailName"></h1>
+          <div class="flex flex-wrap items-center gap-2 mt-1">
+            <span class="text-xs px-2 py-0.5 rounded-full" id="detailCat"></span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600" id="detailOrigin"></span>
+          </div>
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <button onclick="showQrModal()" class="text-xs px-3 py-1.5 bg-mango text-dark font-medium rounded-lg hover:bg-mangoLight transition flex items-center gap-1">
+            <i data-lucide="qr-code" class="w-3.5 h-3.5"></i> QR
+          </button>
+          <button onclick="exportProductCSV()" class="text-xs px-3 py-1.5 bg-dark text-white font-medium rounded-lg hover:bg-darkLight transition flex items-center gap-1">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> CSV
+          </button>
+        </div>
+      </div>
+      <div class="flex gap-0 border-b mb-5 overflow-x-auto" id="detailTabs">
+        <button onclick="showDetailTab('journey')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="journey">Journey</button>
+        <button onclick="showDetailTab('processing')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="processing">Processing</button>
+        <button onclick="showDetailTab('logistics')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="logistics">Logistics</button>
+        <button onclick="showDetailTab('retail')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="retail">Retail</button>
+        <button onclick="showDetailTab('sustainability')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="sustainability">Sustainability</button>
+        <button onclick="showDetailTab('certifications')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="certifications">Certifications</button>
+        <button onclick="showDetailTab('compliance')" class="px-3 py-2 text-sm whitespace-nowrap transition" data-tab="compliance">Compliance</button>
+      </div>
+      <div id="detailContent" class="anim-fade pb-8"></div>
+    </div>
+  </div>
+
+  <!-- CUSTOMER VIEW -->
+  <div id="viewCustomer" class="hidden">
+    <div class="max-w-md mx-auto p-4 w-full pb-24" id="customerContent"></div>
+  </div>
+
+  <!-- INTELLIGENCE -->
+  <div id="viewIntelligence" class="hidden p-4 md:p-6 max-w-7xl mx-auto w-full">
+    <div class="flex items-center justify-between mb-5 anim-fade">
+      <div>
+        <h1 class="text-xl font-bold" data-i18n="intelligence_title">Customer Intelligence</h1>
+        <p class="text-sm text-gray-500">Analyze scan data, consumer behavior, and market opportunities.</p>
+      </div>
+      <button onclick="exportIntelCSV()" class="flex items-center gap-2 text-xs px-3 py-2 border rounded-xl hover:bg-gray-50 transition">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-5 anim-fade-d1">
+      <select id="intelProduct" onchange="updateIntelligence()" class="text-xs px-3 py-1.5 border rounded-lg bg-white"><option value="all">All Products</option></select>
+      <select id="intelRegion" onchange="updateIntelligence()" class="text-xs px-3 py-1.5 border rounded-lg bg-white">
+        <option value="all">All Regions</option><option value="asia">Asia</option><option value="europe">Europe</option>
+      </select>
+      <select id="intelCategory" onchange="updateIntelligence()" class="text-xs px-3 py-1.5 border rounded-lg bg-white">
+        <option value="all">All Categories</option><option value="fresh">Fresh</option><option value="processed">Processed</option>
+      </select>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div class="bg-white rounded-xl p-4 border anim-fade-d1"><p class="text-xs text-gray-500 mb-1">Total Scans</p><p class="text-2xl font-bold mono">24,831</p></div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d2"><p class="text-xs text-gray-500 mb-1">Peak Scan Time</p><p class="text-lg font-bold mono">2–4 PM</p><p class="text-xs text-gray-400">Local time</p></div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d3"><p class="text-xs text-gray-500 mb-1">Repeat Users</p><p class="text-2xl font-bold mono">34%</p><p class="text-xs text-forest">↑ 8%</p></div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d4"><p class="text-xs text-gray-500 mb-1">Avg. Session</p><p class="text-2xl font-bold mono">47s</p></div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4 mb-5">
+      <div class="bg-white rounded-xl p-4 border anim-fade-d2">
+        <h3 class="font-semibold text-sm mb-3">Scans Per Day (Last 14 Days)</h3>
+        <div class="flex items-end gap-1.5 h-32" id="scanChart"></div>
+        <div class="flex justify-between mt-2 text-xs text-gray-400 mono"><span>Jun 1</span><span>Jun 7</span><span>Jun 14</span></div>
+      </div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d3">
+        <h3 class="font-semibold text-sm mb-3">Most Viewed Sections</h3>
+        <div class="space-y-3">
+          <div><div class="flex justify-between text-xs mb-1"><span>Origin & Journey</span><span class="mono">38%</span></div><div class="freshness-bar"><div class="freshness-fill bg-mango" style="width:38%"></div></div></div>
+          <div><div class="flex justify-between text-xs mb-1"><span>Nutrition</span><span class="mono">31%</span></div><div class="freshness-bar"><div class="freshness-fill bg-forest" style="width:31%"></div></div></div>
+          <div><div class="flex justify-between text-xs mb-1"><span>Sustainability</span><span class="mono">22%</span></div><div class="freshness-bar"><div class="freshness-fill bg-green-300" style="width:22%"></div></div></div>
+          <div><div class="flex justify-between text-xs mb-1"><span>Certifications</span><span class="mono">9%</span></div><div class="freshness-bar"><div class="freshness-fill bg-creamDark" style="width:9%"></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4 mb-5">
+      <div class="bg-white rounded-xl p-4 border anim-fade-d2"><h3 class="font-semibold text-sm mb-3">Top Scan Locations</h3><div class="space-y-2" id="locationList"></div></div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d3"><h3 class="font-semibold text-sm mb-3">Product Performance</h3><div class="space-y-2" id="perfList"></div></div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4 mb-5">
+      <div class="bg-white rounded-xl p-4 border anim-fade-d2">
+        <h3 class="font-semibold text-sm mb-3">Repeat vs New Users</h3>
+        <div class="flex items-center gap-4">
+          <div class="relative w-28 h-28 flex-shrink-0">
+            <svg viewBox="0 0 36 36" class="w-full h-full">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e5e5" stroke-width="3"/>
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F4B400" stroke-width="3" stroke-dasharray="34 66" stroke-dashoffset="25" stroke-linecap="round"/>
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#4CAF50" stroke-width="3" stroke-dasharray="66 34" stroke-dashoffset="91" stroke-linecap="round"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center text-xs font-bold">24.8K</div>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-forest"></div>New — 66%</div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-mango"></div>Repeat — 34%</div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-4 border anim-fade-d3">
+        <h3 class="font-semibold text-sm mb-3">Scan → Purchase Rate</h3>
+        <div class="space-y-2" id="conversionList"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl p-4 border mb-5 anim-fade-d4">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="w-6 h-6 rounded-full bg-mango flex items-center justify-center"><i data-lucide="sparkles" class="w-3.5 h-3.5 text-dark"></i></div>
+        <h3 class="font-semibold text-sm">Market Insight Suggestions</h3>
+        <span class="text-xs px-2 py-0.5 bg-cream text-mango rounded-full font-medium">AI-Powered</span>
+      </div>
+      <div class="space-y-2" id="insightsList"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ====== BOTTOM NAV (mobile) ====== -->
+<div class="bottom-nav justify-around items-center" id="bottomNav">
+  <button onclick="showView('dashboard')" class="flex flex-col items-center gap-0.5 px-4 py-1" id="bnDashboard">
+    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+    <span class="text-[10px]">Dashboard</span>
+  </button>
+  <button onclick="showView('intelligence')" class="flex flex-col items-center gap-0.5 px-4 py-1" id="bnIntelligence">
+    <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+    <span class="text-[10px]">Intelligence</span>
+  </button>
+  <button onclick="openAddModal()" class="flex flex-col items-center gap-0.5 px-4 py-1">
+    <div class="w-10 h-10 rounded-full bg-mango flex items-center justify-center -mt-5 shadow-lg">
+      <i data-lucide="plus" class="w-5 h-5 text-dark"></i>
+    </div>
+    <span class="text-[10px] mt-1">Add</span>
+  </button>
+  <button onclick="toggleNotif()" class="flex flex-col items-center gap-0.5 px-4 py-1 relative">
+    <i data-lucide="bell" class="w-5 h-5"></i>
+    <span class="text-[10px]">Alerts</span>
+    <span class="absolute top-1 right-3 w-2 h-2 bg-red-500 rounded-full" id="bnNotifDot"></span>
+  </button>
+  <button onclick="doLogout()" class="flex flex-col items-center gap-0.5 px-4 py-1">
+    <i data-lucide="log-out" class="w-5 h-5"></i>
+    <span class="text-[10px]">Logout</span>
+  </button>
+</div>
+
+</div><!-- end app-root -->
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+let PRODUCTS = [
+  {id:'mango',name:'Thai Mango',emoji:'🥭',cat:'fresh',origin:'Chiang Mai, Thailand',stage:3,status:'In Transit',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Ozone Water',chem:'None',temp:'2-4°C',pack:'Modified Atmosphere'},retail:{shelf:'14 days',expiry:'Jul 28, 2025',arrival:'Jul 18, 2025'},sustain:{carbon:'0.8 kg CO₂',water:'340L/kg'},certs:['GlobalGAP','Organic Thailand','HACCP'],nutrition:{cal:60,sugar:'13g',vitamins:'A, C, B6'},freshDays:5,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:3},{time:'Day 2',temp:2},{time:'Day 3',temp:5},{time:'Day 4',temp:4}],blockchain:{blockId:'0xA8F3...9C21',verifiedBy:'Thai Export Authority',timestamp:'2025-07-18 10:32'}}}},
+  {id:'wheat',name:'Wheat',emoji:'🌾',cat:'fresh',origin:'Nakhon Ratchasima',stage:2,status:'Processing',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Dry Cleaning',chem:'None',temp:'Ambient',pack:'Jute Bags'},retail:{shelf:'180 days',expiry:'Dec 15, 2025',arrival:'Aug 1, 2025'},sustain:{carbon:'0.5 kg CO₂',water:'1827L/kg'},certs:['ISO 22000','Thai Agricultural Standard'],nutrition:{cal:340,sugar:'0g',vitamins:'B1, B3, Iron'},freshDays:120,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:22},{time:'Day 2',temp:24},{time:'Day 3',temp:23},{time:'Day 4',temp:25}],blockchain:{blockId:'0xB2C1...4D88',verifiedBy:'Thai Export Authority',timestamp:'2025-07-20 08:15'}}}},
+  {id:'sugarcane',name:'Sugarcane',emoji:'🎋',cat:'fresh',origin:'Udon Thani',stage:1,status:'Farm',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Pressure Wash',chem:'None',temp:'Ambient',pack:'Bundled'},retail:{shelf:'7 days',expiry:'Jul 22, 2025',arrival:'Jul 20, 2025'},sustain:{carbon:'0.3 kg CO₂',water:'1500L/kg'},certs:['Bonsucro','Organic'],nutrition:{cal:73,sugar:'14g',vitamins:'Iron, Calcium'},freshDays:3,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:20},{time:'Day 2',temp:21},{time:'Day 3',temp:19},{time:'Day 4',temp:22}],blockchain:{blockId:'0xC3E5...7F12',verifiedBy:'Thai Export Authority',timestamp:'2025-07-19 14:00'}}}},
+  {id:'grapes',name:'Grapes',emoji:'🍇',cat:'fresh',origin:'Nakhon Pathom',stage:4,status:'Retail',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Cold Water Rinse',chem:'SO₂ (trace)',temp:'0-2°C',pack:'Clamshell PET'},retail:{shelf:'21 days',expiry:'Aug 5, 2025',arrival:'Jul 15, 2025'},sustain:{carbon:'0.6 kg CO₂',water:'608L/kg'},certs:['GlobalGAP','Pesticide-Free'],nutrition:{cal:69,sugar:'16g',vitamins:'C, K, B6'},freshDays:12,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:1},{time:'Day 2',temp:2},{time:'Day 3',temp:1},{time:'Day 4',temp:2}],blockchain:{blockId:'0xD4F6...8A33',verifiedBy:'Thai Export Authority',timestamp:'2025-07-15 09:45'}}}},
+  {id:'dates',name:'Dates',emoji:'🌴',cat:'fresh',origin:'Prachuap Khiri Khan',stage:3,status:'In Transit',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Dry Brush',chem:'None',temp:'4-6°C',pack:'Tray Sealed'},retail:{shelf:'90 days',expiry:'Oct 12, 2025',arrival:'Jul 25, 2025'},sustain:{carbon:'0.4 kg CO₂',water:'2300L/kg'},certs:['Organic','ISO 22000'],nutrition:{cal:277,sugar:'63g',vitamins:'B6, Iron, Potassium'},freshDays:60,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:5},{time:'Day 2',temp:4},{time:'Day 3',temp:6},{time:'Day 4',temp:5}],blockchain:{blockId:'0xE5G7...9B44',verifiedBy:'Thai Export Authority',timestamp:'2025-07-22 11:20'}}}},
+  {id:'mangosteen',name:'Mangosteen',emoji:'🟣',cat:'fresh',origin:'Chanthaburi',stage:3,status:'In Transit',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Chlorine Wash',chem:'Chlorine 100ppm',temp:'12-13°C',pack:'Foam Net + Box'},retail:{shelf:'14 days',expiry:'Jul 30, 2025',arrival:'Jul 19, 2025'},sustain:{carbon:'0.7 kg CO₂',water:'520L/kg'},certs:['GAP Thailand','Phytosanitary'],nutrition:{cal:73,sugar:'13g',vitamins:'C, B9, B2'},freshDays:7,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:12},{time:'Day 2',temp:13},{time:'Day 3',temp:12},{time:'Day 4',temp:13}],blockchain:{blockId:'0xF6H8...0C55',verifiedBy:'Thai Export Authority',timestamp:'2025-07-19 07:30'}}}},
+  {id:'strawberry',name:'Strawberry',emoji:'🍓',cat:'fresh',origin:'Chiang Mai',stage:2,status:'Processing',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Ozone Spray',chem:'None',temp:'1-3°C',pack:'PET Clamshell'},retail:{shelf:'7 days',expiry:'Jul 22, 2025',arrival:'Jul 18, 2025'},sustain:{carbon:'0.5 kg CO₂',water:'280L/kg'},certs:['GlobalGAP','Organic'],nutrition:{cal:32,sugar:'5g',vitamins:'C, Manganese'},freshDays:4,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:2},{time:'Day 2',temp:1},{time:'Day 3',temp:3},{time:'Day 4',temp:2}],blockchain:{blockId:'0xG7I9...1D66',verifiedBy:'Thai Export Authority',timestamp:'2025-07-18 13:10'}}}},
+  {id:'pineapple',name:'Pineapple',emoji:'🍍',cat:'fresh',origin:'Prachinburi',stage:4,status:'Retail',route:['Laem Chabang','Guangzhou','Hainan','Singapore'],processing:{wash:'Chlorinated Water',chem:'Wax Coating',temp:'8-10°C',pack:'Individual Box'},retail:{shelf:'21 days',expiry:'Aug 8, 2025',arrival:'Jul 14, 2025'},sustain:{carbon:'0.4 kg CO₂',water:'255L/kg'},certs:['GlobalGAP','Thai Select'],nutrition:{cal:50,sugar:'10g',vitamins:'C, B6, Manganese'},freshDays:14,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:23.1291,lng:113.2644,label:'Guangzhou'},{lat:20.0440,lng:110.1999,label:'Hainan'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:9},{time:'Day 2',temp:8},{time:'Day 3',temp:10},{time:'Day 4',temp:9}],blockchain:{blockId:'0xH8J0...2E77',verifiedBy:'Thai Export Authority',timestamp:'2025-07-14 06:55'}}}},
+  {id:'mango-dip',name:'Premium Mango Dip',emoji:'🫙',cat:'processed',origin:'Bangkok',stage:3,status:'In Transit',route:['Laem Chabang','Netherlands','Germany'],processing:{wash:'Steam Sterilization',chem:'Citric Acid',temp:'85°C pasteurized',pack:'Glass Jar 250ml'},retail:{shelf:'365 days',expiry:'Jul 2026',arrival:'Aug 5, 2025'},sustain:{carbon:'1.2 kg CO₂',water:'450L/kg'},certs:['HACCP','FDA','EU Organic'],nutrition:{cal:120,sugar:'22g',vitamins:'A, C'},freshDays:300,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:52.3676,lng:4.9041,label:'Netherlands'},{lat:52.5200,lng:13.4050,label:'Germany'}],temperatureLog:[{time:'Day 1',temp:20},{time:'Day 2',temp:19},{time:'Day 3',temp:21},{time:'Day 4',temp:20}],blockchain:{blockId:'0xI9K1...3F88',verifiedBy:'Thai Export Authority',timestamp:'2025-08-05 15:00'}}}},
+  {id:'sugarcane-juice',name:'Sugarcane Juice',emoji:'🧃',cat:'processed',origin:'Udon Thani',stage:2,status:'Processing',route:['Laem Chabang','Netherlands','Germany'],processing:{wash:'UHT Treatment',chem:'None',temp:'140°C (2s)',pack:'Tetra Pak 330ml'},retail:{shelf:'180 days',expiry:'Jan 2026',arrival:'Aug 10, 2025'},sustain:{carbon:'0.9 kg CO₂',water:'1200L/kg'},certs:['HACCP','Halal','BRC'],nutrition:{cal:110,sugar:'24g',vitamins:'Iron, Calcium'},freshDays:150,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:52.3676,lng:4.9041,label:'Netherlands'},{lat:52.5200,lng:13.4050,label:'Germany'}],temperatureLog:[{time:'Day 1',temp:18},{time:'Day 2',temp:20},{time:'Day 3',temp:19},{time:'Day 4',temp:21}],blockchain:{blockId:'0xJ0L2...4G99',verifiedBy:'Thai Export Authority',timestamp:'2025-08-10 09:00'}}}},
+  {id:'candied-dates',name:'Candied Dates',emoji:'🍬',cat:'processed',origin:'Prachuap Khiri Khan',stage:4,status:'Retail',route:['Laem Chabang','Netherlands','Germany'],processing:{wash:'Sugar Infusion',chem:'Glucose Syrup',temp:'70°C dehydration',pack:'Pouch 200g'},retail:{shelf:'270 days',expiry:'Apr 2026',arrival:'Jul 20, 2025'},sustain:{carbon:'0.6 kg CO₂',water:'1800L/kg'},certs:['ISO 22000','Kosher','Organic EU'],nutrition:{cal:310,sugar:'68g',vitamins:'B6, Potassium'},freshDays:240,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:52.3676,lng:4.9041,label:'Netherlands'},{lat:52.5200,lng:13.4050,label:'Germany'}],temperatureLog:[{time:'Day 1',temp:22},{time:'Day 2',temp:21},{time:'Day 3',temp:23},{time:'Day 4',temp:22}],blockchain:{blockId:'0xK1M3...5H00',verifiedBy:'Thai Export Authority',timestamp:'2025-07-20 12:30'}}}},
+  {id:'crispy-mangosteen',name:'Crispy Mangosteen',emoji:'🥜',cat:'processed',origin:'Chanthaburi',stage:3,status:'In Transit',route:['Laem Chabang','Netherlands','Germany'],processing:{wash:'Freeze Dry',chem:'None',temp:'-40°C sublimation',pack:'Stand-up Pouch 100g'},retail:{shelf:'365 days',expiry:'Jul 2026',arrival:'Aug 15, 2025'},sustain:{carbon:'1.0 kg CO₂',water:'600L/kg'},certs:['HACCP','Vegan Certified','BRC'],nutrition:{cal:350,sugar:'15g',vitamins:'C, B9'},freshDays:330,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:52.3676,lng:4.9041,label:'Netherlands'},{lat:52.5200,lng:13.4050,label:'Germany'}],temperatureLog:[{time:'Day 1',temp:-38},{time:'Day 2',temp:-40},{time:'Day 3',temp:-39},{time:'Day 4',temp:-40}],blockchain:{blockId:'0xL2N4...6I11',verifiedBy:'Thai Export Authority',timestamp:'2025-08-15 07:00'}}}},
+  {id:'grape-wine',name:'Grape Wine',emoji:'🍷',cat:'processed',origin:'Nakhon Pathom',stage:2,status:'Processing',route:['Laem Chabang','Netherlands','Germany'],processing:{wash:'Fermentation',chem:'Sulfites (trace)',temp:'15-18°C',pack:'Glass Bottle 750ml'},retail:{shelf:'730 days',expiry:'2027',arrival:'Sep 1, 2025'},sustain:{carbon:'1.5 kg CO₂',water:'870L/kg'},certs:['Wine Standards','EU PDO','Organic'],nutrition:{cal:85,sugar:'1g',vitamins:'Antioxidants'},freshDays:700,journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:52.3676,lng:4.9041,label:'Netherlands'},{lat:52.5200,lng:13.4050,label:'Germany'}],temperatureLog:[{time:'Day 1',temp:16},{time:'Day 2',temp:15},{time:'Day 3',temp:17},{time:'Day 4',temp:16}],blockchain:{blockId:'0xM3O5...7J22',verifiedBy:'Thai Export Authority',timestamp:'2025-09-01 10:00'}}}}
+];
+
+const EXTENDED={mango:{farm:{harvestDate:"2025-07-10",humidity:"78%",temperature:"32°C",soilPH:"6.2",pesticide:"None (Organic)"},processing:{washTemp:"5°C",chemical:"Ozone Water",grade:"Food Grade A"},logistics:{container:"Reefer 40ft",boxes:1200,temp:"2-4°C",optimal:"3°C",routeTimeline:[{time:"07:05 PM",location:"Laem Chabang Port",status:"Departed"},{time:"Day 2",location:"Guangzhou",status:"Transit"},{time:"Day 4",location:"Hainan",status:"Transfer"},{time:"Day 6",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-16",distribution:[{to:"NTUC FairPrice",qty:400},{to:"Cold Storage",qty:300},{to:"Sheng Siong",qty:500}]},retail:{lot:"LOT-A2389",stores:["NTUC FairPrice Orchard","Cold Storage Marina Bay"]}},wheat:{farm:{harvestDate:"2025-06-20",humidity:"55%",temperature:"28°C",soilPH:"7.0",pesticide:"Minimal (GAP)"},processing:{washTemp:"Ambient",chemical:"None",grade:"Milling Grade A"},logistics:{container:"Standard 40ft",boxes:2400,temp:"Ambient",optimal:"22°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 3",location:"Guangzhou",status:"Transit"},{time:"Day 5",location:"Hainan",status:"Transfer"},{time:"Day 8",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-28",distribution:[{to:"Flour Mills SG",qty:1000},{to:"Bakery Supplies Co.",qty:800},{to:"Export Hub",qty:600}]},retail:{lot:"LOT-W1102",stores:["Flour Depot Jurong","Baking World Tampines"]}},sugarcane:{farm:{harvestDate:"2025-07-15",humidity:"82%",temperature:"35°C",soilPH:"6.5",pesticide:"None (Organic)"},processing:{washTemp:"Ambient",chemical:"None",grade:"Raw Grade B"},logistics:{container:"Open Truck",boxes:600,temp:"Ambient",optimal:"25°C",routeTimeline:[{time:"Day 1",location:"Udon Thani Farm",status:"Departed"},{time:"Day 2",location:"Laem Chabang Port",status:"Loaded"},{time:"Day 4",location:"Guangzhou",status:"Transit"},{time:"Day 6",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-20",distribution:[{to:"Juice Factory SG",qty:300},{to:"Street Market",qty:200},{to:"Wholesale Hub",qty:100}]},retail:{lot:"LOT-SC0451",stores:["Chinatown Street Market","Tekka Market"]}},grapes:{farm:{harvestDate:"2025-07-01",humidity:"65%",temperature:"30°C",soilPH:"6.8",pesticide:"SO₂ (trace)"},processing:{washTemp:"2°C",chemical:"SO₂ Trace",grade:"Export Grade AA"},logistics:{container:"Reefer 20ft",boxes:900,temp:"0-2°C",optimal:"1°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 3",location:"Guangzhou",status:"Transit"},{time:"Day 5",location:"Hainan",status:"Transfer"},{time:"Day 7",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-15",distribution:[{to:"Cold Storage Orchard",qty:400},{to:"NTUC Premium",qty:300},{to:"Don Don Donki",qty:200}]},retail:{lot:"LOT-GR7721",stores:["Cold Storage Orchard","Don Don Donki Holland Village"]}},dates:{farm:{harvestDate:"2025-05-10",humidity:"40%",temperature:"38°C",soilPH:"7.5",pesticide:"None (Organic)"},processing:{washTemp:"Ambient",chemical:"None",grade:"Premium Medjool Grade"},logistics:{container:"Reefer 20ft",boxes:500,temp:"4-6°C",optimal:"5°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 3",location:"Guangzhou",status:"Transit"},{time:"Day 5",location:"Hainan",status:"Transfer"},{time:"Day 7",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-25",distribution:[{to:"Mustafa Centre",qty:200},{to:"Fairtrade Organic SG",qty:150},{to:"Cold Storage",qty:150}]},retail:{lot:"LOT-DT3301",stores:["Mustafa Centre","Fairtrade Organic SG"]}},mangosteen:{farm:{harvestDate:"2025-07-05",humidity:"80%",temperature:"31°C",soilPH:"5.5",pesticide:"Chlorine Wash"},processing:{washTemp:"12°C",chemical:"Chlorine 100ppm",grade:"Export Grade A"},logistics:{container:"Reefer 20ft",boxes:800,temp:"12-13°C",optimal:"12.5°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 2",location:"Guangzhou",status:"Transit"},{time:"Day 4",location:"Hainan",status:"Transfer"},{time:"Day 5",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-19",distribution:[{to:"Sheng Siong",qty:300},{to:"Cold Storage",qty:300},{to:"Wet Market Supplier",qty:200}]},retail:{lot:"LOT-MG5512",stores:["Sheng Siong Toa Payoh","Cold Storage VivoCity"]}},strawberry:{farm:{harvestDate:"2025-07-12",humidity:"75%",temperature:"22°C",soilPH:"6.0",pesticide:"None (Organic)"},processing:{washTemp:"3°C",chemical:"Ozone Spray",grade:"Food Grade A"},logistics:{container:"Reefer 20ft",boxes:600,temp:"1-3°C",optimal:"2°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 2",location:"Guangzhou",status:"Transit"},{time:"Day 3",location:"Hainan",status:"Transfer"},{time:"Day 4",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-18",distribution:[{to:"Cold Storage Premium",qty:250},{to:"Don Don Donki",qty:200},{to:"NTUC FairPrice",qty:150}]},retail:{lot:"LOT-SB0874",stores:["Cold Storage Premium ION","Don Don Donki Orchard"]}},pineapple:{farm:{harvestDate:"2025-06-28",humidity:"76%",temperature:"33°C",soilPH:"5.8",pesticide:"Wax Coating"},processing:{washTemp:"9°C",chemical:"Wax Coating",grade:"Export Grade A"},logistics:{container:"Reefer 40ft",boxes:1500,temp:"8-10°C",optimal:"9°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 3",location:"Guangzhou",status:"Transit"},{time:"Day 5",location:"Hainan",status:"Transfer"},{time:"Day 7",location:"Singapore",status:"Arrived"}]},warehouse:{arrival:"2025-07-14",distribution:[{to:"NTUC FairPrice",qty:600},{to:"Sheng Siong",qty:500},{to:"Giant",qty:400}]},retail:{lot:"LOT-PA9934",stores:["NTUC FairPrice Jurong","Giant Tampines"]}},"mango-dip":{farm:{harvestDate:"2025-06-15",humidity:"78%",temperature:"32°C",soilPH:"6.2",pesticide:"None (Organic)"},processing:{washTemp:"85°C",chemical:"Citric Acid",grade:"Food Grade A — Pasteurized"},logistics:{container:"Standard 40ft",boxes:3000,temp:"Ambient",optimal:"20°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 10",location:"Suez Canal",status:"Transit"},{time:"Day 18",location:"Rotterdam",status:"Transfer"},{time:"Day 20",location:"Amsterdam",status:"Arrived"}]},warehouse:{arrival:"2025-08-05",distribution:[{to:"Albert Heijn",qty:1200},{to:"Jumbo Supermarkt",qty:900},{to:"Lidl DE",qty:900}]},retail:{lot:"LOT-MD1102",stores:["Albert Heijn Amsterdam","Jumbo Rotterdam","Lidl Berlin"]}},"sugarcane-juice":{farm:{harvestDate:"2025-06-10",humidity:"82%",temperature:"35°C",soilPH:"6.5",pesticide:"None (Organic)"},processing:{washTemp:"140°C",chemical:"None (UHT)",grade:"UHT Grade A"},logistics:{container:"Standard 40ft",boxes:4000,temp:"Ambient",optimal:"20°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 12",location:"Suez Canal",status:"Transit"},{time:"Day 20",location:"Rotterdam",status:"Transfer"},{time:"Day 22",location:"Amsterdam",status:"Arrived"}]},warehouse:{arrival:"2025-08-10",distribution:[{to:"Carrefour FR",qty:1500},{to:"Edeka DE",qty:1200},{to:"Rewe DE",qty:1300}]},retail:{lot:"LOT-SJ2231",stores:["Carrefour Paris","Edeka Berlin","Rewe Hamburg"]}},"candied-dates":{farm:{harvestDate:"2025-04-01",humidity:"38%",temperature:"38°C",soilPH:"7.5",pesticide:"None (Organic)"},processing:{washTemp:"70°C",chemical:"Glucose Syrup",grade:"Confectionery Grade A"},logistics:{container:"Standard 20ft",boxes:2000,temp:"Ambient",optimal:"22°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 11",location:"Suez Canal",status:"Transit"},{time:"Day 19",location:"Rotterdam",status:"Transfer"},{time:"Day 21",location:"Amsterdam",status:"Arrived"}]},warehouse:{arrival:"2025-07-20",distribution:[{to:"Holland & Barrett",qty:700},{to:"Whole Foods DE",qty:600},{to:"Bio Company",qty:700}]},retail:{lot:"LOT-CD4412",stores:["Holland & Barrett Amsterdam","Whole Foods Berlin"]}},"crispy-mangosteen":{farm:{harvestDate:"2025-06-20",humidity:"80%",temperature:"31°C",soilPH:"5.5",pesticide:"None"},processing:{washTemp:"-40°C",chemical:"None (Freeze-dry)",grade:"Snack Grade Premium"},logistics:{container:"Standard 20ft",boxes:1800,temp:"Ambient",optimal:"20°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 13",location:"Suez Canal",status:"Transit"},{time:"Day 21",location:"Rotterdam",status:"Transfer"},{time:"Day 23",location:"Amsterdam",status:"Arrived"}]},warehouse:{arrival:"2025-08-15",distribution:[{to:"Holland & Barrett",qty:600},{to:"DM Drogerie",qty:600},{to:"Müller DE",qty:600}]},retail:{lot:"LOT-CM7791",stores:["Holland & Barrett Utrecht","DM Drogerie Berlin"]}},"grape-wine":{farm:{harvestDate:"2025-03-10",humidity:"65%",temperature:"27°C",soilPH:"6.8",pesticide:"Sulfites (trace)"},processing:{washTemp:"16°C",chemical:"Sulfites (trace)",grade:"Wine Standard Grade"},logistics:{container:"Reefer 20ft",boxes:2500,temp:"15-18°C",optimal:"16°C",routeTimeline:[{time:"Day 1",location:"Laem Chabang Port",status:"Departed"},{time:"Day 14",location:"Suez Canal",status:"Transit"},{time:"Day 24",location:"Rotterdam",status:"Transfer"},{time:"Day 26",location:"Amsterdam",status:"Arrived"}]},warehouse:{arrival:"2025-09-01",distribution:[{to:"Wine & More NL",qty:900},{to:"Galeria Kaufhof DE",qty:800},{to:"Marks & Spencer",qty:800}]},retail:{lot:"LOT-GW0012",stores:["Wine & More Amsterdam","Galeria Kaufhof Berlin"]}}};
+
+const STAGES=['Farm','Processing','Logistics','Retail'];
+const LOCATIONS=[{city:'Singapore',country:'Singapore',region:'asia',scans:8420,pct:34},{city:'Guangzhou',country:'China',region:'asia',scans:5210,pct:21},{city:'Amsterdam',country:'Netherlands',region:'europe',scans:3880,pct:16},{city:'Berlin',country:'Germany',region:'europe',scans:2940,pct:12},{city:'Haikou',country:'China (Hainan)',region:'asia',scans:2180,pct:9},{city:'Hamburg',country:'Germany',region:'europe',scans:1201,pct:5},{city:'Bangkok',country:'Thailand',region:'asia',scans:1000,pct:3}];
+const SCAN_DATA=[820,950,780,1120,1340,1560,1210,980,1450,1680,1920,1540,1380,1760];
+const INSIGHTS=[{icon:'trending-up',text:'Mango has high engagement in Singapore — consider increasing export volume by 20%.',type:'opportunity'},{icon:'globe',text:'Processed products consistently outperform fresh in European markets. Expand processed range.',type:'growth'},{icon:'clock',text:'Peak scanning at 2–4 PM suggests in-store browsing. Optimize QR placement on shelf-facing packaging.',type:'timing'},{icon:'repeat',text:'34% repeat scan rate indicates strong brand interest. Launch a loyalty program to convert.',type:'retention'},{icon:'bar-chart-2',text:'Mangosteen scans surged 45% this week in Guangzhou. Possible viral social media exposure.',type:'alert'}];
+
+// ============================================================
+// STATE
+// ============================================================
+let currentView='dashboard', currentRole='business', currentProduct=null;
+let currentDetailTab='journey', currentFilter='all', currentLang='en';
+let isDark=false, searchQuery='', leafletMap=null, notifOpen=false;
+
+// ============================================================
+// i18n
+// ============================================================
+const I18N={
+  en:{nav_dashboard:'Dashboard',nav_intelligence:'Intelligence',dashboard_title:'Business Overview',dashboard_sub:'Track products, compliance, and engagement.',add_product:'Add Product',product_registry:'Product Registry',kpi_products:'Total Products',kpi_shipments:'Active Shipments',kpi_compliance:'Compliance Rate',on_schedule:'On schedule',back_dashboard:'Back to Dashboard',intelligence_title:'Customer Intelligence'},
+  th:{nav_dashboard:'แดชบอร์ด',nav_intelligence:'ข้อมูลเชิงลึก',dashboard_title:'ภาพรวมธุรกิจ',dashboard_sub:'ติดตามสินค้า การปฏิบัติตามกฎ และการมีส่วนร่วม',add_product:'เพิ่มสินค้า',product_registry:'ทะเบียนสินค้า',kpi_products:'สินค้าทั้งหมด',kpi_shipments:'การขนส่งที่ใช้งาน',kpi_compliance:'อัตราการปฏิบัติตาม',on_schedule:'ตรงเวลา',back_dashboard:'กลับสู่แดชบอร์ด',intelligence_title:'ข้อมูลลูกค้า'},
+  zh:{nav_dashboard:'仪表板',nav_intelligence:'数据分析',dashboard_title:'业务概览',dashboard_sub:'跟踪产品、合规性和参与度。',add_product:'添加产品',product_registry:'产品注册',kpi_products:'总产品数',kpi_shipments:'活跃货运',kpi_compliance:'合规率',on_schedule:'按时',back_dashboard:'返回仪表板',intelligence_title:'客户情报'},
+  fr:{nav_dashboard:'Tableau de bord',nav_intelligence:'Intelligence',dashboard_title:'Vue d\'ensemble',dashboard_sub:'Suivez les produits, la conformité et l\'engagement.',add_product:'Ajouter un produit',product_registry:'Registre des produits',kpi_products:'Total produits',kpi_shipments:'Expéditions actives',kpi_compliance:'Taux de conformité',on_schedule:'Dans les délais',back_dashboard:'Retour au tableau de bord',intelligence_title:'Intelligence client'}
+};
+
+function setLang(lang){
+  currentLang=lang;
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.id==='lang'+lang.toUpperCase()));
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.dataset.i18n;
+    if(I18N[lang]?.[key]) el.textContent=I18N[lang][key];
+  });
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+function doLogin(role){
+  currentRole=role;
+  document.getElementById('loginScreen').style.display='none';
+  // แสดง main content
+  document.getElementById('mainContent').style.display='';
+  document.getElementById('topNav').style.display='';
+  document.getElementById('roleLabel').textContent=role==='business'?'Business':'Consumer';
+  document.getElementById('roleLabel').className=`text-xs px-2 py-1 ${role==='business'?'bg-forest':'bg-mango text-dark'} rounded-full text-white font-medium`;
+  if(role==='consumer'){
+    document.getElementById('bizNav').style.display='none';
+    document.getElementById('bottomNav').style.display='none';
+    filterCategory('all');
+    openCustomerView(PRODUCTS[0]);
+  } else {
+    document.getElementById('bizNav').style.display='';
+    document.getElementById('bottomNav').style.display='';
+    filterCategory('all');
+    buildNotifications();
+    // แสดง onboarding ก่อน dashboard เสมอ (ถ้ายังไม่เคยดู)
+    showView('dashboard');
+    setTimeout(()=>showOnboarding(), 100);
+  }
+}
+
+function doLogout(){
+  document.getElementById('loginScreen').style.display='flex';
+  currentRole='business';
+}
+
+// ============================================================
+// ONBOARDING
+// ============================================================
+function showOnboarding(){
+  const overlay = document.getElementById('onboardingOverlay');
+  overlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function nextOnboard(step){
+  document.querySelectorAll('.onboard-step').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('onboardStep'+step)?.classList.remove('hidden');
+  document.querySelectorAll('#onboardDots div').forEach((d,i)=>{
+    d.className='w-2 h-2 rounded-full '+(i===step?'bg-dark':'bg-gray-200');
+  });
+}
+function skipOnboard(){
+  localStorage.setItem('agrinexis_onboarded','1');
+  document.getElementById('onboardingOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+// ============================================================
+// DARK MODE
+// ============================================================
+function toggleDark(){
+  isDark=!isDark;
+  document.getElementById('bodyEl').classList.toggle('dark-mode',isDark);
+  document.getElementById('darkBtn').innerHTML=isDark?'<i data-lucide="sun" class="w-4 h-4"></i>':'<i data-lucide="moon" class="w-4 h-4"></i>';
+  lucide.createIcons();
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+let NOTIFICATIONS=[];
+function buildNotifications(){
+  NOTIFICATIONS=[];
+  PRODUCTS.forEach(p=>{
+    const alerts=checkAlerts(p.id);
+    alerts.forEach(a=>NOTIFICATIONS.push({product:p.name,emoji:p.emoji,msg:a.message,read:false}));
+  });
+  if(NOTIFICATIONS.length){
+    document.getElementById('notifDot').style.display='block';
+    document.getElementById('bnNotifDot') && (document.getElementById('bnNotifDot').style.display='block');
+  }
+  renderNotifList();
+}
+function renderNotifList(){
+  const list=document.getElementById('notifList');
+  if(!NOTIFICATIONS.length){list.innerHTML='<p class="text-xs text-gray-400 p-4 text-center">No alerts</p>';return;}
+  list.innerHTML=NOTIFICATIONS.map((n,i)=>`
+    <div class="px-4 py-3 border-b hover:bg-gray-50 cursor-pointer transition ${n.read?'opacity-50':''}" onclick="markRead(${i})">
+      <div class="flex items-start gap-2">
+        <span class="text-lg">${n.emoji}</span>
+        <div class="flex-1"><p class="text-xs font-semibold">${n.product}</p><p class="text-xs text-gray-500 mt-0.5">${n.msg}</p></div>
+        ${!n.read?'<div class="w-2 h-2 rounded-full bg-mango mt-1 flex-shrink-0"></div>':''}
+      </div>
+    </div>`).join('');
+  lucide.createIcons();
+}
+function markRead(i){NOTIFICATIONS[i].read=true;renderNotifList();}
+function toggleNotif(){
+  notifOpen=!notifOpen;
+  document.getElementById('notifPanel').classList.toggle('hidden',!notifOpen);
+  document.getElementById('notifBackdrop').classList.toggle('hidden',!notifOpen);
+  lucide.createIcons();
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+function onSearch(q){
+  searchQuery=q.toLowerCase().trim();
+  if(document.getElementById('globalSearch')) document.getElementById('globalSearch').value=q;
+  if(document.getElementById('mobileSearch')) document.getElementById('mobileSearch').value=q;
+  renderProducts();
+}
+
+// ============================================================
+// ALERTS
+// ============================================================
+function checkAlerts(productId){
+  const p=PRODUCTS.find(x=>x.id===productId);
+  const ext=EXTENDED[productId];
+  const alerts=[];
+  if(!p||!ext) return alerts;
+  if(ext.logistics?.temperatureLog&&ext.logistics?.optimal){
+    const optimal=parseFloat(ext.logistics.optimal);
+    ext.logistics.temperatureLog.forEach(t=>{
+      if(Math.abs(t.temp-optimal)>3) alerts.push({message:`⚠️ Temp spike at ${t.time}: ${t.temp}°C (optimal ${ext.logistics.optimal})`});
+    });
+  }
+  if(p.status==='Processing'&&p.cat==='fresh'&&p.freshDays<=4) alerts.push({message:`⚠️ Short shelf life (${p.freshDays} days) — expedite processing`});
+  return alerts;
+}
+
+// ============================================================
+// VIEW MANAGEMENT
+// ============================================================
+function showView(view){
+  currentView=view;
+  ['dashboard','detail','customer','intelligence'].forEach(v=>document.getElementById('viewD'+v.charAt(0).toUpperCase()+v.slice(1)||'view'+v.charAt(0).toUpperCase()+v.slice(1))?.classList.add('hidden'));
+  document.getElementById('viewDashboard').classList.add('hidden');
+  document.getElementById('viewDetail').classList.add('hidden');
+  document.getElementById('viewCustomer').classList.add('hidden');
+  document.getElementById('viewIntelligence').classList.add('hidden');
+
+  if(view==='dashboard'){document.getElementById('viewDashboard').classList.remove('hidden');renderProducts();}
+  else if(view==='detail'){document.getElementById('viewDetail').classList.remove('hidden');renderDetail();}
+  else if(view==='customer'){document.getElementById('viewCustomer').classList.remove('hidden');}
+  else if(view==='intelligence'){document.getElementById('viewIntelligence').classList.remove('hidden');renderIntelligence();}
+
+  updateNavTabs();
+  const isBiz=currentRole==='business';
+  document.getElementById('bizNav').classList.toggle('hidden',!isBiz);
+
+  if(leafletMap){leafletMap.remove();leafletMap=null;}
+  lucide.createIcons();
+}
+
+function updateNavTabs(){
+  const d=document.getElementById('navDashboard');
+  const i=document.getElementById('navIntelligence');
+  if(d) d.className=`px-3 py-2.5 text-sm transition ${(currentView==='dashboard'||currentView==='detail')?'tab-active':'tab-inactive'}`;
+  if(i) i.className=`px-3 py-2.5 text-sm transition ${currentView==='intelligence'?'tab-active':'tab-inactive'}`;
+  // bottom nav
+  ['bnDashboard','bnIntelligence'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.className='flex flex-col items-center gap-0.5 px-4 py-1 '+(id==='bnDashboard'&&(currentView==='dashboard'||currentView==='detail')?'text-mango':id==='bnIntelligence'&&currentView==='intelligence'?'text-mango':'text-gray-500');
+  });
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function filterCategory(cat){
+  currentFilter=cat;
+  document.getElementById('filterAll').className=`text-xs px-3 py-1 rounded-full border transition ${cat==='all'?'bg-dark text-white border-dark':'bg-white text-dark'}`;
+  document.getElementById('filterFresh').className=`text-xs px-3 py-1 rounded-full border transition ${cat==='fresh'?'bg-forest text-white border-forest':'bg-white text-dark'}`;
+  document.getElementById('filterProcessed').className=`text-xs px-3 py-1 rounded-full border transition ${cat==='processed'?'bg-mango text-dark border-mango':'bg-white text-dark'}`;
+  renderProducts();
+}
+
+function renderProducts(){
+  const list=document.getElementById('productList');
+  const noRes=document.getElementById('noResults');
+  const statusF=document.getElementById('statusFilter')?.value||'all';
+
+  let filtered=PRODUCTS.filter(p=>{
+    const catOk=currentFilter==='all'||p.cat===currentFilter;
+    const statusOk=statusF==='all'||p.status===statusF;
+    const searchOk=!searchQuery||p.name.toLowerCase().includes(searchQuery)||p.origin.toLowerCase().includes(searchQuery)||p.status.toLowerCase().includes(searchQuery);
+    return catOk&&statusOk&&searchOk;
+  });
+
+  document.getElementById('kpiProductCount').textContent=PRODUCTS.length;
+  noRes.classList.toggle('hidden',filtered.length>0);
+
+  const fresh=filtered.filter(p=>p.cat==='fresh');
+  const processed=filtered.filter(p=>p.cat==='processed');
+  let html='';
+  if(fresh.length){
+    html+=`<div class="mb-1 mt-2"><span class="text-xs font-semibold text-forest uppercase tracking-wider">🌿 Fresh Products</span></div>`;
+    fresh.forEach(p=>html+=productCard(p));
+  }
+  if(processed.length){
+    html+=`<div class="mt-4 mb-1"><span class="text-xs font-semibold text-mango uppercase tracking-wider">🏭 Processed Products</span></div>`;
+    processed.forEach(p=>html+=productCard(p));
+  }
+  list.innerHTML=html;
+  lucide.createIcons();
+}
+
+function productCard(p){
+  const stageHtml=STAGES.map((s,i)=>{
+    const cls=i<p.stage?'stage-done':i===p.stage?'stage-active':'stage-pending';
+    return `<div class="flex items-center gap-1"><div class="stage-dot ${cls}"></div><span class="text-xs text-gray-400">${s}</span></div>`;
+  }).join('<div class="flex-1 h-px bg-gray-200"></div>');
+  const statusColor=p.status==='Retail'?'bg-forest text-white':p.status==='In Transit'?'bg-mango text-dark':p.status==='Processing'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-600';
+  const alerts=checkAlerts(p.id);
+  const nameHtml=searchQuery?p.name.replace(new RegExp(searchQuery,'gi'),m=>`<mark class="highlight">${m}</mark>`):p.name;
+
+  return `<div class="bg-white rounded-xl p-3 border hover:border-mango/40 transition cursor-pointer anim-slide" onclick="openDetail('${p.id}')">
+    <div class="flex items-center gap-3">
+      <div class="text-2xl w-10 h-10 rounded-lg bg-cream flex items-center justify-center flex-shrink-0">${p.emoji}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-sm">${nameHtml}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded ${statusColor}">${p.status}</span>
+          ${alerts.length?`<span class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600">⚠️ ${alerts.length} alert${alerts.length>1?'s':''}</span>`:''}
+        </div>
+        <p class="text-xs text-gray-400 truncate">${p.origin}</p>
+      </div>
+      <div class="hidden sm:flex items-center gap-1">${stageHtml}</div>
+      <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300 flex-shrink-0"></i>
+    </div>
+  </div>`;
+}
+
+function openDetail(id){
+  currentProduct=PRODUCTS.find(p=>p.id===id);
+  currentDetailTab='journey';
+  showView('detail');
+}
+
+// ============================================================
+// ADD PRODUCT
+// ============================================================
+function openAddModal(){
+  document.getElementById('addProductModal').classList.remove('hidden');
+  lucide.createIcons();
+}
+function closeAddModal(){
+  stopScanner();
+  document.getElementById('scanResult').classList.add('hidden');
+  document.getElementById('addProductModal').classList.add('hidden');
+}
+function submitAddProduct(){
+  const name=document.getElementById('addName').value.trim();
+  const origin=document.getElementById('addOrigin').value.trim();
+  if(!name||!origin){showToast('Please fill in Name and Origin');return;}
+  const newP={
+    id:'custom-'+Date.now(),
+    name,emoji:document.getElementById('addEmoji').value||'🌿',
+    cat:document.getElementById('addCat').value,
+    origin,stage:0,
+    status:document.getElementById('addStatus').value,
+    route:['Laem Chabang','Singapore'],
+    processing:{wash:'Standard',chem:'None',temp:'Ambient',pack:'Standard'},
+    retail:{shelf:'30 days',expiry:'TBD',arrival:'TBD'},
+    sustain:{carbon:document.getElementById('addCarbon').value||'N/A',water:'N/A'},
+    certs:document.getElementById('addCerts').value.split(',').map(s=>s.trim()).filter(Boolean),
+    nutrition:{cal:parseInt(document.getElementById('addCal').value)||0,sugar:document.getElementById('addSugar').value||'N/A',vitamins:'N/A'},
+    freshDays:parseInt(document.getElementById('addFreshDays').value)||14,
+    journeyFull:{logistics:{gps:[{lat:13.0827,lng:100.8830,label:'Laem Chabang'},{lat:1.3521,lng:103.8198,label:'Singapore'}],temperatureLog:[{time:'Day 1',temp:20}],blockchain:{blockId:'0xNEW...'+Math.random().toString(16).slice(2,6).toUpperCase(),verifiedBy:'Thai Export Authority',timestamp:new Date().toISOString().slice(0,16).replace('T',' ')}}}
+  };
+  PRODUCTS.push(newP);
+  EXTENDED[newP.id]={
+    farm:{harvestDate:'TBD',humidity:'N/A',temperature:'N/A',soilPH:'N/A',pesticide:'N/A'},
+    processing:{washTemp:'N/A',chemical:'None',grade:'Standard'},
+    logistics:{container:'Standard',boxes:0,temp:'Ambient',optimal:'20°C',routeTimeline:[{time:'Day 1',location:'Origin',status:'Departed'},{time:'TBD',location:'Destination',status:'Pending'}]},
+    warehouse:{arrival:'TBD',distribution:[]},
+    retail:{lot:'LOT-NEW-'+Math.floor(Math.random()*9999),stores:['TBD']}
+  };
+  closeAddModal();
+  renderProducts();
+  buildNotifications();
+  showToast(`✅ "${name}" added successfully!`);
+  ['addName','addOrigin','addCerts','addCal','addSugar','addFreshDays','addCarbon'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('addEmoji').value='🌿';
+}
+
+// ============================================================
+// QR CODE (real SVG generation)
+// ============================================================
+function generateQRSVG(text,size=200){
+  // Simple QR-like visual using consistent hash
+  let hash=0;for(let i=0;i<text.length;i++){hash=((hash<<5)-hash)+text.charCodeAt(i);hash|=0;}
+  const cells=21,cell=Math.floor(size/cells);
+  let svg=`<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="background:white">`;
+  // finder patterns
+  [[0,0],[0,cells-7],[cells-7,0]].forEach(([r,c])=>{
+    svg+=`<rect x="${c*cell}" y="${r*cell}" width="${7*cell}" height="${7*cell}" fill="black"/>`;
+    svg+=`<rect x="${(c+1)*cell}" y="${(r+1)*cell}" width="${5*cell}" height="${5*cell}" fill="white"/>`;
+    svg+=`<rect x="${(c+2)*cell}" y="${(r+2)*cell}" width="${3*cell}" height="${3*cell}" fill="black"/>`;
+  });
+  // data modules
+  let h=Math.abs(hash);
+  for(let r=0;r<cells;r++){
+    for(let c=0;c<cells;c++){
+      const inFinder=(r<8&&c<8)||(r<8&&c>=cells-8)||(r>=cells-8&&c<8);
+      if(!inFinder){
+        h=(h*1664525+1013904223)&0xffffffff;
+        if((h&1)||((r+c)%2===0&&(h&3))){
+          svg+=`<rect x="${c*cell}" y="${r*cell}" width="${cell}" height="${cell}" fill="black"/>`;
+        }
+      }
+    }
+  }
+  svg+='</svg>';
+  return svg;
+}
+
+function showQrModal(){
+  if(!currentProduct) return;
+  const p=currentProduct;
+  document.getElementById('qrProductName').textContent=p.name;
+  document.getElementById('qrDisplay').innerHTML=generateQRSVG(`https://passportdpp.app/product/${p.id}`,180);
+  document.getElementById('qrModal').classList.remove('hidden');
+  lucide.createIcons();
+}
+function closeQrModal(){document.getElementById('qrModal').classList.add('hidden');}
+function downloadQR(){
+  if(!currentProduct) return;
+  const svg=document.querySelector('#qrDisplay svg');
+  if(!svg) return;
+  const blob=new Blob([svg.outerHTML],{type:'image/svg+xml'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`QR_${currentProduct.id}.svg`;
+  a.click();
+  showToast('QR downloaded!');
+}
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function exportProductCSV(){
+  if(!currentProduct) return;
+  const p=currentProduct;
+  const ext=EXTENDED[p.id]||{};
+  const rows=[
+    ['Field','Value'],
+    ['Name',p.name],['Category',p.cat],['Origin',p.origin],['Status',p.status],
+    ['Route',p.route.join(' → ')],['Shelf Life',p.retail.shelf],['Expiry',p.retail.expiry],
+    ['Carbon',p.sustain.carbon],['Water',p.sustain.water],
+    ['Calories',p.nutrition.cal],['Sugar',p.nutrition.sugar],['Vitamins',p.nutrition.vitamins],
+    ['Certifications',p.certs.join(', ')],
+    ['Harvest Date',ext.farm?.harvestDate||'N/A'],['Container',ext.logistics?.container||'N/A'],
+    ['Lot',ext.retail?.lot||'N/A']
+  ];
+  const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${p.id}_passport.csv`;
+  a.click();
+  showToast('CSV exported!');
+}
+function exportIntelCSV(){
+  const rows=[['City','Country','Scans','Percentage'],...LOCATIONS.map(l=>[l.city,l.country,l.scans,l.pct+'%'])];
+  const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='intelligence_report.csv';
+  a.click();
+  showToast('Intelligence CSV exported!');
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg){
+  const t=document.createElement('div');
+  t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2800);
+}
+
+// ============================================================
+// DETAIL VIEW
+// ============================================================
+function renderDetail(){
+  if(!currentProduct) return;
+  const p=currentProduct;
+  document.getElementById('detailIcon').textContent=p.emoji;
+  document.getElementById('detailIcon').style.background=p.cat==='fresh'?'#E8F5E9':'#FFF4D6';
+  document.getElementById('detailName').textContent=p.name;
+  document.getElementById('detailCat').textContent=p.cat==='fresh'?'Fresh':'Processed';
+  document.getElementById('detailCat').className=`text-xs px-2 py-0.5 rounded-full ${p.cat==='fresh'?'bg-green-100 text-forest':'bg-yellow-100 text-yellow-700'}`;
+  document.getElementById('detailOrigin').textContent=p.origin;
+  showDetailTab('journey');
+}
+
+function showDetailTab(tab){
+  currentDetailTab=tab;
+  document.querySelectorAll('#detailTabs button').forEach(btn=>{
+    btn.className=`px-3 py-2 text-sm whitespace-nowrap transition ${btn.dataset.tab===tab?'tab-active':'tab-inactive'}`;
+  });
+  const c=document.getElementById('detailContent');
+  const p=currentProduct;
+  if(!p) return;
+  if(leafletMap){leafletMap.remove();leafletMap=null;}
+
+  if(tab==='journey'){
+    const ext=EXTENDED[p.id];
+    c.innerHTML=`
+    <div class="space-y-5">
+      <div class="bg-white p-4 rounded-xl border anim-fade">
+        <h3 class="font-semibold mb-3">📍 Journey Overview</h3>
+        <p class="text-sm text-gray-500 mb-3">${p.route.join(' → ')}</p>
+        <div class="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+          <span>Farm</span><span>Processing</span><span>Shipping</span><span>Retail</span>
+        </div>
+        <div class="relative h-1.5 bg-gray-200 rounded-full">
+          <div class="h-full rounded-full bg-forest" style="width:${Math.min(100,(p.stage/3)*100)}%"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-forest border-2 border-white shadow" style="left:calc(${Math.min(100,(p.stage/3)*100)}% - 6px)"></div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 anim-fade-d1">
+        <button onclick="showStageDetail('farm')" class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium hover:bg-green-200 transition">🌾 Farm</button>
+        <button onclick="showStageDetail('processing')" class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition">🏭 Processing</button>
+        <button onclick="showStageDetail('logistics')" class="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-200 transition">🚢 Logistics</button>
+        <button onclick="showStageDetail('warehouse')" class="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-200 transition">🏬 Warehouse</button>
+        <button onclick="showStageDetail('retail')" class="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-medium hover:bg-pink-200 transition">🛒 Retail</button>
+      </div>
+      <div id="stageDetailPanel" class="bg-white p-4 rounded-xl border text-sm anim-fade-d2"></div>
+    </div>`;
+    setTimeout(()=>showStageDetail('farm'),50);
+
+  } else if(tab==='processing'){
+    c.innerHTML=`<div class="grid grid-cols-2 gap-3">
+      ${[['Washing',p.processing.wash,'droplets'],['Chemicals',p.processing.chem,'flask-round'],['Temperature',p.processing.temp,'thermometer'],['Packaging',p.processing.pack,'box']].map(([l,v,ic])=>
+        `<div class="bg-white border rounded-xl p-3 anim-fade"><div class="flex items-center gap-2 mb-1"><i data-lucide="${ic}" class="w-4 h-4 text-mango"></i><span class="text-xs text-gray-500">${l}</span></div><p class="font-medium text-sm">${v}</p></div>`
+      ).join('')}</div>`;
+
+  } else if(tab==='logistics'){
+    const lotId='LOT-'+Math.floor(Math.random()*10000);
+    c.innerHTML=`<div class="space-y-4 anim-fade">
+      <div class="bg-white border rounded-xl p-4">
+        <h3 class="font-semibold text-sm mb-3">Shipping Details</h3>
+        <div class="space-y-2">
+          ${[['Route Type',p.cat==='fresh'?'Reefer Container':'Standard Container'],['Origin Port',p.route[0]],['Destination',p.route[p.route.length-1]],['Temperature',p.processing.temp],['Status',p.status]].map(([l,v])=>
+            `<div class="flex justify-between text-sm"><span class="text-gray-500">${l}</span><span class="font-medium">${v}</span></div>`).join('')}
+        </div>
+        <p class="text-xs text-gray-400 mt-3 mono">Tracking Lot: ${lotId}</p>
+      </div>
+      <div class="bg-white border rounded-xl p-4">
+        <h3 class="font-semibold text-sm mb-2">GPS Route Map</h3>
+        <div id="leafletMapBox" style="height:220px;border-radius:12px;overflow:hidden;"></div>
+      </div>
+      <div class="bg-white border rounded-xl p-4">
+        <h3 class="font-semibold text-sm mb-2">Temperature Log</h3>
+        <div id="tempChart" class="h-32 flex items-end gap-1"></div>
+      </div>
+      <div id="blockchainBox" class="p-3 bg-cream rounded-xl text-xs"></div>
+    </div>`;
+    setTimeout(()=>{
+      renderLeafletMap(p);
+      renderTempChart(p);
+      renderBlockchain(p);
+    },150);
+
+  } else if(tab==='retail'){
+    c.innerHTML=`<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      ${[['Shelf Life',p.retail.shelf,'clock'],['Expiry Date',p.retail.expiry,'calendar'],['Est. Arrival',p.retail.arrival,'truck']].map(([l,v,ic])=>
+        `<div class="bg-white border rounded-xl p-4 text-center anim-fade"><i data-lucide="${ic}" class="w-5 h-5 mx-auto mb-2 text-mango"></i><p class="text-xs text-gray-500">${l}</p><p class="font-bold text-lg mt-1">${v}</p></div>`
+      ).join('')}</div>`;
+
+  } else if(tab==='sustainability'){
+    c.innerHTML=`<div class="grid grid-cols-2 gap-3 anim-fade">
+      <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center"><i data-lucide="cloud" class="w-6 h-6 mx-auto mb-2 text-forest"></i><p class="text-xs text-gray-500">Carbon Footprint</p><p class="font-bold text-xl mt-1">${p.sustain.carbon}</p></div>
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center"><i data-lucide="droplets" class="w-6 h-6 mx-auto mb-2 text-blue-500"></i><p class="text-xs text-gray-500">Water Usage</p><p class="font-bold text-xl mt-1">${p.sustain.water}</p></div>
+    </div>`;
+
+  } else if(tab==='certifications'){
+    c.innerHTML=`<div class="space-y-2 anim-fade">${p.certs.map(cert=>
+      `<div class="flex items-center gap-3 bg-white border rounded-xl p-3"><div class="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center"><i data-lucide="badge-check" class="w-4 h-4 text-forest"></i></div><span class="font-medium text-sm">${cert}</span><span class="ml-auto text-xs px-2 py-0.5 bg-green-100 text-forest rounded-full">Verified</span></div>`
+    ).join('')}</div>`;
+
+  } else if(tab==='compliance'){
+    const isEurope = p.route[p.route.length-1] === 'Germany' || p.route.includes('Netherlands') || p.route.includes('Germany');
+    if(isEurope){
+      c.innerHTML=`<div class="space-y-4 anim-fade">
+        <div class="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+          <span class="text-2xl">🇪🇺</span>
+          <div><p class="font-semibold text-sm text-blue-800">EU Market Compliance</p><p class="text-xs text-blue-600">Destination: ${p.route[p.route.length-1]}</p></div>
+        </div>
+
+        <div class="bg-white border rounded-xl p-4">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0"><i data-lucide="file-check" class="w-4 h-4 text-blue-600"></i></div>
+            <div>
+              <p class="font-semibold text-sm">EU Digital Product Passport (DPP)</p>
+              <span class="text-xs px-2 py-0.5 bg-green-100 text-forest rounded-full">✅ Compliant</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Regulation (EU) 2024/1781 — บังคับใช้ปี 2026 กำหนดให้สินค้าทุกชิ้นที่วางขายใน EU ต้องมี Digital Product Passport ระบุข้อมูล lifecycle ครบถ้วน</p>
+          <div class="space-y-2">
+            ${[
+              ['Product Identity','Unique ID + QR Code','✅'],
+              ['Origin Traceability','Farm → Port → Destination','✅'],
+              ['Material Information','Processing & Chemicals','✅'],
+              ['Carbon Footprint','${p.sustain.carbon}','✅'],
+              ['Repair & Recyclability','Packaging info recorded','✅'],
+            ].map(([l,v,s])=>`
+              <div class="flex items-center justify-between text-xs py-1.5 border-b last:border-0">
+                <span class="text-gray-500">${l}</span>
+                <div class="flex items-center gap-2"><span class="font-medium">${v}</span><span>${s}</span></div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div class="bg-white border rounded-xl p-4">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0"><i data-lucide="tree-pine" class="w-4 h-4 text-forest"></i></div>
+            <div>
+              <p class="font-semibold text-sm">EU Deforestation Regulation (EUDR)</p>
+              <span class="text-xs px-2 py-0.5 bg-green-100 text-forest rounded-full">✅ Compliant</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Regulation (EU) 2023/1115 — บังคับใช้ปี 2025 ห้ามนำเข้าสินค้าที่ผลิตจากพื้นที่ตัดไม้ทำลายป่า ครอบคลุมสินค้าเกษตรทุกประเภท</p>
+          <div class="space-y-2">
+            ${[
+              ['Geolocation Data','GPS coordinates recorded','✅'],
+              ['Land Use Verification','Non-deforestation zone','✅'],
+              ['Due Diligence Statement','Blockchain verified','✅'],
+              ['Supply Chain Mapping','Full farm-to-port trace','✅'],
+            ].map(([l,v,s])=>`
+              <div class="flex items-center justify-between text-xs py-1.5 border-b last:border-0">
+                <span class="text-gray-500">${l}</span>
+                <div class="flex items-center gap-2"><span class="font-medium">${v}</span><span>${s}</span></div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div class="bg-cream p-3 rounded-xl text-xs flex items-start gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-mango mt-0.5 flex-shrink-0"></i>
+          <p class="text-gray-600">AgriNexis generates compliance-ready data automatically. Export full EU DPP report as PDF for customs submission.</p>
+        </div>
+      </div>`;
+    } else {
+      c.innerHTML=`<div class="space-y-4 anim-fade">
+        <div class="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+          <span class="text-2xl">🇨🇳</span>
+          <div><p class="font-semibold text-sm text-red-800">China Market Compliance</p><p class="text-xs text-red-600">Destination: ${p.route[p.route.length-1]}</p></div>
+        </div>
+
+        <div class="bg-white border rounded-xl p-4">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0"><i data-lucide="shield-check" class="w-4 h-4 text-red-600"></i></div>
+            <div>
+              <p class="font-semibold text-sm">GACC Registration</p>
+              <span class="text-xs px-2 py-0.5 bg-green-100 text-forest rounded-full">✅ Registered</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">General Administration of Customs China — ผู้ส่งออกสินค้าเกษตรไทยทุกรายต้องขึ้นทะเบียนกับ GACC ก่อนส่งออกไปจีน บังคับใช้ตั้งแต่ปี 2022</p>
+          <div class="space-y-2">
+            ${[
+              ['Exporter Registration','Thai Export Authority #TH-2024','✅'],
+              ['Product Safety Standard','GB 2762 / GB 2763','✅'],
+              ['Pesticide Residue Limit','Within MRL limits','✅'],
+              ['Phytosanitary Certificate','Issued by DOAD Thailand','✅'],
+              ['Cold Chain Integrity','Temp log blockchain verified','✅'],
+            ].map(([l,v,s])=>`
+              <div class="flex items-center justify-between text-xs py-1.5 border-b last:border-0">
+                <span class="text-gray-500">${l}</span>
+                <div class="flex items-center gap-2"><span class="font-medium">${v}</span><span>${s}</span></div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div class="bg-white border rounded-xl p-4">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0"><i data-lucide="file-text" class="w-4 h-4 text-orange-600"></i></div>
+            <div>
+              <p class="font-semibold text-sm">China GB Food Safety Standards</p>
+              <span class="text-xs px-2 py-0.5 bg-green-100 text-forest rounded-full">✅ Compliant</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">มาตรฐานความปลอดภัยอาหารแห่งชาติจีน ครอบคลุมสารปนเปื้อน สารกำจัดศัตรูพืช และการแสดงฉลากสินค้า</p>
+          <div class="space-y-2">
+            ${[
+              ['Contaminant Limits','GB 2762-2022 compliant','✅'],
+              ['Pesticide MRL','GB 2763-2021 compliant','✅'],
+              ['Labeling Requirements','Chinese label ready','✅'],
+              ['Traceability Record','Farm-to-port recorded','✅'],
+            ].map(([l,v,s])=>`
+              <div class="flex items-center justify-between text-xs py-1.5 border-b last:border-0">
+                <span class="text-gray-500">${l}</span>
+                <div class="flex items-center gap-2"><span class="font-medium">${v}</span><span>${s}</span></div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div class="bg-cream p-3 rounded-xl text-xs flex items-start gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-mango mt-0.5 flex-shrink-0"></i>
+          <p class="text-gray-600">AgriNexis generates GACC-ready documentation automatically. Export compliance report for customs clearance at Chinese ports.</p>
+        </div>
+      </div>`;
+    }
+  }
+  lucide.createIcons();
+}
+
+// ============================================================
+// LEAFLET MAP
+// ============================================================
+function renderLeafletMap(p){
+  const gps=p.journeyFull?.logistics?.gps;
+  if(!gps||!gps.length) return;
+  const mapEl=document.getElementById('leafletMapBox');
+  if(!mapEl) return;
+  if(leafletMap){leafletMap.remove();leafletMap=null;}
+  leafletMap=L.map('leafletMapBox',{zoomControl:true,scrollWheelZoom:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(leafletMap);
+  const latlngs=gps.map(g=>[g.lat,g.lng]);
+  L.polyline(latlngs,{color:'#F4B400',weight:3,dashArray:'6 4'}).addTo(leafletMap);
+  gps.forEach((g,i)=>{
+    const isFirst=i===0,isLast=i===gps.length-1;
+    const color=isFirst?'#4CAF50':isLast?'#F4B400':'#3b82f6';
+    const marker=L.circleMarker([g.lat,g.lng],{radius:8,color:'white',weight:2,fillColor:color,fillOpacity:1}).addTo(leafletMap);
+    marker.bindPopup(`<b>${g.label}</b><br>${isFirst?'Origin':isLast?'Destination':'Waypoint'}`);
+  });
+  leafletMap.fitBounds(latlngs,{padding:[20,20]});
+}
+
+function renderTempChart(p){
+  const chart=document.getElementById('tempChart');
+  if(!chart||!p.journeyFull?.logistics?.temperatureLog) return;
+  const temps=p.journeyFull.logistics.temperatureLog;
+  const max=Math.max(...temps.map(t=>Math.abs(t.temp)))||1;
+  chart.innerHTML=temps.map(t=>{
+    const h=Math.max(8,Math.round((Math.abs(t.temp)/max)*100));
+    const col=t.temp<0?'#60A5FA':t.temp<10?'#4CAF50':'#F4B400';
+    return `<div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
+      <span class="text-[10px] text-gray-500 mono">${t.temp}°</span>
+      <div style="height:${h}%;background:${col};min-height:8px;" class="w-full rounded-t transition-all"></div>
+      <span class="text-[10px] text-gray-400">${t.time}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderBlockchain(p){
+  const bc=document.getElementById('blockchainBox');
+  if(!bc) return;
+  const b=p.journeyFull?.logistics?.blockchain;
+  if(!b){bc.innerHTML='';return;}
+  bc.innerHTML=`<div class="flex items-center gap-2 mb-2"><i data-lucide="shield-check" class="w-4 h-4 text-forest"></i><p class="font-semibold text-forest">Blockchain Verified</p></div>
+    <div class="mono text-gray-600 space-y-0.5">
+      <p>Block ID: <span class="font-medium">${b.blockId}</span></p>
+      <p>Authority: <span class="font-medium">${b.verifiedBy}</span></p>
+      <p>Timestamp: <span class="font-medium">${b.timestamp}</span></p>
+    </div>`;
+  lucide.createIcons();
+}
+
+// ============================================================
+// STAGE DETAIL
+// ============================================================
+function showStageDetail(type){
+  const p=currentProduct;
+  const ext=EXTENDED[p.id];
+  const panel=document.getElementById('stageDetailPanel');
+  if(!panel) return;
+
+  if(type==='farm'){
+    if(!ext?.farm){panel.innerHTML=`<p class="text-gray-400 text-xs">No farm data available.</p>`;return;}
+    panel.innerHTML=`<h3 class="font-semibold mb-3">🌾 Farm Details</h3>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        ${[['Harvest Date',ext.farm.harvestDate],['Humidity',ext.farm.humidity],['Temperature',ext.farm.temperature],['Soil pH',ext.farm.soilPH],['Pesticide',ext.farm.pesticide]]
+          .map(([l,v])=>`<div class="bg-gray-50 rounded-lg p-2"><p class="text-gray-400 mb-0.5">${l}</p><p class="font-semibold">${v}</p></div>`).join('')}
+      </div>`;
+  } else if(type==='processing'){
+    if(!ext?.processing){panel.innerHTML=`<p class="text-gray-400 text-xs">No processing data.</p>`;return;}
+    panel.innerHTML=`<h3 class="font-semibold mb-3">🏭 Processing</h3>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        ${[['Wash Temp',ext.processing.washTemp],['Chemical',ext.processing.chemical],['Grade',ext.processing.grade]]
+          .map(([l,v])=>`<div class="bg-gray-50 rounded-lg p-2"><p class="text-gray-400 mb-0.5">${l}</p><p class="font-semibold">${v}</p></div>`).join('')}
+      </div>`;
+  } else if(type==='logistics'){
+    if(!ext?.logistics){panel.innerHTML=`<p class="text-gray-400 text-xs">No logistics data.</p>`;return;}
+    const alerts=checkAlerts(p.id);
+    const tl=ext.logistics;
+    panel.innerHTML=`<h3 class="font-semibold mb-3">🚢 Logistics</h3>
+      ${alerts.length?alerts.map(a=>`<div class="bg-red-50 border border-red-200 text-red-600 p-2 rounded-lg mb-2 text-xs">${a.message}</div>`).join(''):`<div class="text-green-600 text-xs mb-2">✅ All conditions normal</div>`}
+      <div class="grid grid-cols-3 gap-2 text-xs mb-3">
+        ${[['Container',tl.container],['Boxes',tl.boxes.toLocaleString()],['Temp Range',tl.temp]]
+          .map(([l,v])=>`<div class="bg-gray-50 rounded-lg p-2 text-center"><p class="text-gray-400 mb-0.5">${l}</p><p class="font-semibold">${v}</p></div>`).join('')}
+      </div>
+      <div class="space-y-1 text-xs">
+        ${tl.routeTimeline.map((t,i)=>`
+          <div class="flex items-center gap-2 py-1 border-b last:border-0">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${i<p.stage?'bg-forest text-white':'bg-gray-100 text-gray-500'}">${i+1}</div>
+            <span class="font-medium flex-1">${t.location}</span>
+            <span class="text-gray-400">${t.time} · ${t.status}</span>
+          </div>`).join('')}
+      </div>
+      <div class="mt-3 bg-green-50 p-2 rounded-lg text-xs text-green-700 mono">
+        🔗 Blockchain Verified${p.journeyFull?.logistics?.blockchain?` · ${p.journeyFull.logistics.blockchain.blockId}`:''}
+      </div>`;
+  } else if(type==='warehouse'){
+    if(!ext?.warehouse){panel.innerHTML=`<p class="text-gray-400 text-xs">No warehouse data.</p>`;return;}
+    panel.innerHTML=`<h3 class="font-semibold mb-3">🏬 Warehouse</h3>
+      <div class="text-xs mb-3 bg-gray-50 rounded-lg p-2"><p class="text-gray-400">Arrival Date</p><p class="font-semibold">${ext.warehouse.arrival}</p></div>
+      <p class="text-xs font-semibold text-gray-500 mb-2">Distribution</p>
+      <div class="space-y-1 text-xs">
+        ${(ext.warehouse.distribution||[]).map(d=>`<div class="flex justify-between py-1 border-b last:border-0"><span>${d.to}</span><span class="mono font-medium">${(d.qty||0).toLocaleString()} units</span></div>`).join('')||'<p class="text-gray-400">No distribution data</p>'}
+      </div>`;
+  } else if(type==='retail'){
+    if(!ext?.retail){panel.innerHTML=`<p class="text-gray-400 text-xs">No retail data.</p>`;return;}
+    panel.innerHTML=`<h3 class="font-semibold mb-3">🛒 Retail</h3>
+      <div class="text-xs mb-3 bg-gray-50 rounded-lg p-2"><p class="text-gray-400">LOT Number</p><p class="font-semibold mono">${ext.retail.lot}</p></div>
+      <p class="text-xs font-semibold text-gray-500 mb-2">Store Locations</p>
+      <div class="space-y-1 text-xs">
+        ${(ext.retail.stores||[]).map(s=>`<div class="flex items-center gap-2 py-1 border-b last:border-0"><span>📍</span><span>${s}</span></div>`).join('')}
+      </div>`;
+  }
+}
+
+// ============================================================
+// CUSTOMER VIEW
+// ============================================================
+function openCustomerView(product){
+  currentProduct=product||PRODUCTS[0];
+  const p=currentProduct;
+  const freshPct=Math.min(100,Math.max(5,(p.freshDays/14)*100));
+  const freshColor=freshPct>60?'#4CAF50':freshPct>30?'#F4B400':'#f44336';
+  const badges=[];
+  if(p.processing.chem==='None') badges.push({icon:'shield-check',label:'No Chemicals'});
+  if(p.certs.some(c=>c.toLowerCase().includes('organic'))) badges.push({icon:'leaf',label:'Organic'});
+  badges.push({icon:'thermometer',label:'Cold Chain'});
+  const journeySteps=[{label:'Harvested',sub:p.origin,done:true},{label:'Processed',sub:'Quality Checked',done:p.stage>=1},{label:'Shipped',sub:p.route[0],done:p.stage>=2},{label:'Arrived',sub:p.route[p.route.length-1],done:p.stage>=3}];
+
+  // Language selector for consumer
+  const langBar=`<div class="flex justify-center gap-2 mb-4">
+    ${['en','th','zh','fr'].map(l=>`<button onclick="setLang('${l}')" class="text-xs px-2 py-1 rounded-lg border font-medium hover:bg-gray-50 transition ${currentLang===l?'bg-dark text-white border-dark':''}">${l.toUpperCase()}</button>`).join('')}
+  </div>`;
+
+  document.getElementById('customerContent').innerHTML=`
+    ${langBar}
+    <div class="mobile-card bg-white border shadow-sm mb-4 anim-fade">
+      <div class="bg-gradient-to-br from-cream to-yellow-50 p-6 text-center">
+        <div class="text-6xl mb-3">${p.emoji}</div>
+        <h1 class="text-xl font-bold">${p.name}</h1>
+        <p class="text-sm text-gray-500 mt-1">${p.origin}</p>
+        <div class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium" style="background:${freshColor}20;color:${freshColor}">
+          <i data-lucide="clock" class="w-4 h-4"></i> Fresh for ${p.freshDays} days
+        </div>
+      </div>
+      <div class="p-4">
+        <div class="flex gap-2 mb-4">${badges.map(b=>`<div class="flex-1 flex flex-col items-center gap-1 p-2 bg-green-50 rounded-xl"><i data-lucide="${b.icon}" class="w-4 h-4 text-forest"></i><span class="text-xs text-center font-medium">${b.label}</span></div>`).join('')}</div>
+        <h3 class="font-semibold text-sm mb-2 mt-4">Journey</h3>
+        <div class="flex items-center justify-between mb-4">
+          ${journeySteps.map((s,i)=>`<div class="flex flex-col items-center text-center flex-1">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${s.done?'bg-forest text-white':'bg-gray-100 text-gray-400'}">${i+1}</div>
+            <p class="text-xs font-medium mt-1">${s.label}</p><p class="text-xs text-gray-400">${s.sub}</p>
+          </div>${i<3?`<div class="h-0.5 flex-1 mt-[-16px] ${s.done?'bg-forest':'bg-gray-200'}"></div>`:''}`).join('')}
+        </div>
+        <h3 class="font-semibold text-sm mb-2">Freshness</h3>
+        <div class="freshness-bar mb-4"><div class="freshness-fill" style="width:${freshPct}%;background:${freshColor}"></div></div>
+        <h3 class="font-semibold text-sm mb-2">Nutrition</h3>
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <div class="text-center p-2 bg-gray-50 rounded-xl"><p class="text-lg font-bold">${p.nutrition.cal}</p><p class="text-xs text-gray-500">kcal</p></div>
+          <div class="text-center p-2 bg-gray-50 rounded-xl"><p class="text-lg font-bold">${p.nutrition.sugar}</p><p class="text-xs text-gray-500">Sugar</p></div>
+          <div class="text-center p-2 bg-gray-50 rounded-xl"><p class="text-xs font-bold mt-1">${p.nutrition.vitamins}</p><p class="text-xs text-gray-500 mt-0.5">Vitamins</p></div>
+        </div>
+        <h3 class="font-semibold text-sm mb-2">Storage Advice</h3>
+        <div class="p-3 bg-blue-50 rounded-xl text-sm text-blue-700 mb-4 flex items-start gap-2">
+          <i data-lucide="info" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+          <span>Store at ${p.processing.temp}. Keep away from sunlight. Consume within ${p.freshDays} days.</span>
+        </div>
+        <h3 class="font-semibold text-sm mb-2">Sustainability</h3>
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <div class="flex items-center gap-2 p-2 bg-green-50 rounded-xl"><i data-lucide="cloud" class="w-4 h-4 text-forest"></i><div><p class="text-xs text-gray-500">Carbon</p><p class="font-medium text-sm">${p.sustain.carbon}</p></div></div>
+          <div class="flex items-center gap-2 p-2 bg-blue-50 rounded-xl"><i data-lucide="droplets" class="w-4 h-4 text-blue-500"></i><div><p class="text-xs text-gray-500">Water</p><p class="font-medium text-sm">${p.sustain.water}</p></div></div>
+        </div>
+        <!-- QR -->
+        <div class="border rounded-xl p-3 flex items-center gap-3 mb-4">
+          <div>${generateQRSVG('https://passportdpp.app/product/'+p.id,52)}</div>
+          <div><p class="text-xs font-semibold">Scan to verify authenticity</p><p class="text-xs text-gray-400 mono">${p.certs[0]||'Certified'} · AgriNexis</p></div>
+        </div>
+        <button onclick="showView('dashboard')" class="w-full py-3 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-darkLight transition flex items-center justify-center gap-2">
+          <i data-lucide="file-text" class="w-4 h-4"></i> View Full Business Data
+        </button>
+      </div>
+    </div>`;
+  showView('customer');
+}
+
+// ============================================================
+// INTELLIGENCE
+// ============================================================
+function renderIntelligence(){
+  renderScanChart();renderLocations();renderPerformance();renderConversions();renderInsights();populateIntelFilters();
+}
+function renderScanChart(){
+  const max=Math.max(...SCAN_DATA);
+  document.getElementById('scanChart').innerHTML=SCAN_DATA.map((v,i)=>
+    `<div class="flex-1 flex flex-col items-center justify-end h-full">
+      <div class="chart-bar w-full bg-mango" style="height:${(v/max)*100}%" title="${v} scans"></div>
+    </div>`).join('');
+}
+function renderLocations(){
+  document.getElementById('locationList').innerHTML=LOCATIONS.map(l=>
+    `<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
+      <div class="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-xs font-bold">${l.country.slice(0,2).toUpperCase()}</div>
+      <div class="flex-1"><p class="text-sm font-medium">${l.city}</p><p class="text-xs text-gray-400">${l.country}</p></div>
+      <div class="text-right"><p class="text-sm font-bold mono">${l.scans.toLocaleString()}</p><p class="text-xs text-gray-400">${l.pct}%</p></div>
+    </div>`).join('');
+}
+function renderPerformance(){
+  const sorted=[...PRODUCTS].sort((a,b)=>b.freshDays-a.freshDays);
+  document.getElementById('perfList').innerHTML=
+    `<p class="text-xs text-gray-400 mb-1">Most Scanned</p>`+
+    sorted.slice(0,5).map((p,i)=>`<div class="flex items-center gap-2 py-1"><span class="text-sm">${p.emoji}</span><span class="text-sm flex-1 truncate">${p.name}</span><span class="mono text-xs text-gray-500">${(2400-i*380).toLocaleString()}</span></div>`).join('')+
+    `<p class="text-xs text-gray-400 mt-3 mb-1">Least Scanned</p>`+
+    sorted.slice(-3).reverse().map((p,i)=>`<div class="flex items-center gap-2 py-1"><span class="text-sm">${p.emoji}</span><span class="text-sm flex-1 truncate">${p.name}</span><span class="mono text-xs text-gray-500">${(320-i*90).toLocaleString()}</span></div>`).join('');
+}
+function renderConversions(){
+  const data=[{name:'Thai Mango',rate:72},{name:'Premium Mango Dip',rate:65},{name:'Grapes',rate:58},{name:'Crispy Mangosteen',rate:54},{name:'Pineapple',rate:48}];
+  document.getElementById('conversionList').innerHTML=data.map(d=>`
+    <div><div class="flex justify-between text-xs mb-1"><span>${d.name}</span><span class="mono font-medium">${d.rate}%</span></div>
+    <div class="freshness-bar"><div class="freshness-fill" style="width:${d.rate}%;background:${d.rate>60?'#4CAF50':d.rate>45?'#F4B400':'#e5e5e5'}"></div></div></div>`).join('');
+}
+function renderInsights(){
+  document.getElementById('insightsList').innerHTML=INSIGHTS.map(ins=>
+    `<div class="insight-card bg-cream/40 p-3 rounded-r-lg flex items-start gap-2">
+      <i data-lucide="${ins.icon}" class="w-4 h-4 text-mango mt-0.5 flex-shrink-0"></i><p class="text-sm">${ins.text}</p>
+    </div>`).join('');
+  lucide.createIcons();
+}
+function populateIntelFilters(){
+  const sel=document.getElementById('intelProduct');
+  if(sel.options.length<=1){PRODUCTS.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});}
+}
+function updateIntelligence(){renderIntelligence();}
+
+// ============================================================
+// SDK
+// ============================================================
+const defaultConfig={platform_name:'AgriNexis',dashboard_title:'Business Overview',company_name:'Thai Export Co.',background_color:'#F8F9FA',surface_color:'#FFFFFF',text_color:'#1A1A2E',primary_action_color:'#F4B400',secondary_action_color:'#4CAF50',font_family:'DM Sans',font_size:14};
+window.elementSdk.init({
+  defaultConfig,
+  onConfigChange:async(config)=>{
+    document.body.style.backgroundColor=config.background_color||defaultConfig.background_color;
+    document.body.style.color=config.text_color||defaultConfig.text_color;
+    const navTitle=document.getElementById('navTitle');if(navTitle)navTitle.textContent=config.platform_name||defaultConfig.platform_name;
+    const dashTitle=document.getElementById('dashTitle');if(dashTitle)dashTitle.textContent=config.dashboard_title||defaultConfig.dashboard_title;
+  },
+  mapToCapabilities:(config)=>({
+    recolorables:[
+      {get:()=>config.background_color||defaultConfig.background_color,set:(v)=>{config.background_color=v;window.elementSdk.setConfig({background_color:v});}},
+      {get:()=>config.primary_action_color||defaultConfig.primary_action_color,set:(v)=>{config.primary_action_color=v;window.elementSdk.setConfig({primary_action_color:v});}},
+      {get:()=>config.secondary_action_color||defaultConfig.secondary_action_color,set:(v)=>{config.secondary_action_color=v;window.elementSdk.setConfig({secondary_action_color:v});}},
+    ],
+    borderables:[],
+    fontEditable:{get:()=>config.font_family||defaultConfig.font_family,set:(v)=>{config.font_family=v;window.elementSdk.setConfig({font_family:v});}},
+    fontSizeable:{get:()=>config.font_size||defaultConfig.font_size,set:(v)=>{config.font_size=v;window.elementSdk.setConfig({font_size:v});}}
+  }),
+  mapToEditPanelValues:(config)=>new Map([['platform_name',config.platform_name||defaultConfig.platform_name],['dashboard_title',config.dashboard_title||defaultConfig.dashboard_title],['company_name',config.company_name||defaultConfig.company_name]])
+});
+
+// ============================================================
+// CUSTOMER VIEW PREVIEW (from business mode)
+// ============================================================
+let isCustomerPreview = false;
+function toggleCustomerPreview(){
+  isCustomerPreview = !isCustomerPreview;
+  const btn = document.getElementById('customerViewBtn');
+  if(isCustomerPreview){
+    // เลือก product ที่กำลังดูอยู่ ถ้าไม่มีใช้อันแรก
+    const previewProduct = currentProduct || PRODUCTS[0];
+    openCustomerView(previewProduct);
+    btn.className = 'text-xs px-2 py-1 bg-mango text-dark border border-mango rounded-full transition flex items-center gap-1 font-semibold';
+    // ซ่อน bizNav
+    document.getElementById('bizNav').style.display = 'none';
+  } else {
+    showView(currentView === 'customer' ? 'dashboard' : currentView);
+    btn.className = 'text-xs px-2 py-1 bg-white/10 border border-white/30 rounded-full hover:bg-white/20 transition flex items-center gap-1';
+    document.getElementById('bizNav').style.display = '';
+  }
+  lucide.createIcons();
+}
+
+// ============================================================
+// BARCODE SCANNER
+// ============================================================
+let scannerStream = null;
+let scannerInterval = null;
+
+async function startScanner(){
+  const box = document.getElementById('scannerBox');
+  const btn = document.getElementById('scanBtn');
+  const video = document.getElementById('scannerVideo');
+
+  // Check camera support
+  if(!navigator.mediaDevices?.getUserMedia){
+    showToast('⚠️ Camera not supported on this browser');
+    return;
+  }
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = scannerStream;
+    box.classList.remove('hidden');
+    btn.classList.add('hidden');
+
+    // ถ้า browser รองรับ BarcodeDetector ใช้เลย
+    if('BarcodeDetector' in window){
+      const detector = new BarcodeDetector({formats:['ean_13','ean_8','qr_code','code_128','code_39']});
+      scannerInterval = setInterval(async()=>{
+        try{
+          const barcodes = await detector.detect(video);
+          if(barcodes.length > 0){
+            handleScanResult(barcodes[0].rawValue);
+          }
+        } catch(e){}
+      }, 500);
+    } else {
+      // Fallback: simulate scan หลัง 2 วินาที (demo mode)
+      setTimeout(()=>{
+        handleScanResult('DEMO-BARCODE-8850125001234');
+      }, 2000);
+    }
+  } catch(err){
+    showToast('⚠️ Cannot access camera — please allow camera permission');
+    box.classList.add('hidden');
+    btn.classList.remove('hidden');
+  }
+}
+
+function stopScanner(){
+  if(scannerStream){
+    scannerStream.getTracks().forEach(t => t.stop());
+    scannerStream = null;
+  }
+  if(scannerInterval){
+    clearInterval(scannerInterval);
+    scannerInterval = null;
+  }
+  document.getElementById('scannerBox').classList.add('hidden');
+  document.getElementById('scanBtn').classList.remove('hidden');
+}
+
+function handleScanResult(code){
+  stopScanner();
+  const resultBox = document.getElementById('scanResult');
+  resultBox.classList.remove('hidden');
+  resultBox.innerHTML = `✅ Scanned: <span class="font-semibold mono">${code}</span> — กรุณาตรวจสอบและแก้ไขข้อมูลด้านล่าง`;
+
+  // Auto-fill ข้อมูลจาก barcode (demo: map รหัสสินค้าตัวอย่าง)
+  const demoMap = {
+    'DEMO-BARCODE-8850125001234': {name:'Dragon Fruit', emoji:'🐉', origin:'Chiang Rai, Thailand', cat:'fresh', cal:60, sugar:'9g', freshDays:7},
+    'default': {name:`Product #${code.slice(-4)}`, emoji:'🌿', origin:'Thailand', cat:'fresh', cal:0, sugar:'N/A', freshDays:14}
+  };
+  const data = demoMap[code] || demoMap['default'];
+  document.getElementById('addName').value = data.name;
+  document.getElementById('addEmoji').value = data.emoji;
+  document.getElementById('addOrigin').value = data.origin;
+  document.getElementById('addCat').value = data.cat;
+  document.getElementById('addCal').value = data.cal;
+  document.getElementById('addSugar').value = data.sugar;
+  document.getElementById('addFreshDays').value = data.freshDays;
+  showToast('✅ Auto-filled from barcode!');
+}
+
+
+document.getElementById('topNav').style.display = 'none';
+document.getElementById('bizNav').style.display = 'none';
+document.getElementById('mainContent').style.display = 'none';
+document.getElementById('bottomNav').style.display = 'none';
+lucide.createIcons();
+</script>
+</body>
+</html>
